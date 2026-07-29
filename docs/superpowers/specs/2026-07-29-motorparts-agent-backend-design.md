@@ -31,7 +31,8 @@ The checked contract contains 54 operations: 27 `GET` operations and 27 state-ch
 - `src/agent/workflows/data_query.py`: a subgraph that selects the cataloged `getDashboard` operation and never executes a mutation.
 - `src/agent/workflows/create.py` and `src/agent/middlewares/hitl.py`: supplier-creation staging plus interrupt/resume approval boundary.
 - `src/agent/workflows/bi_query.py`: a standalone `StateGraph` factory reserved for future Text2SQL/BI implementation; it has no database connection or LLM in this increment.
-- `src/agent/subagents/` and `skills/`: empty-but-documented extension points for later deep research specialists and progressive-disclosure operating instructions.
+- `src/agent/subagents/loader.py`: parses and validates declarative YAML subagent definitions into immutable `SubagentDefinition` values. `api_view/agent_loader.py` loads those definitions before building the main graph; model/tool instantiation remains deferred.
+- `src/agent/subagents/configs/researcher.yaml` and `skills/`: a starter deep-research specialist definition and progressive-disclosure operating instructions.
 
 ## Data Flow
 

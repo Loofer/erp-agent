@@ -140,3 +140,49 @@ def execute(self, operation: Operation, **kwargs: object) -> dict[str, object]:
 Run: `uv run pytest -v && uv run ruff check .`
 
 Expected: all tests pass, Ruff reports no violations, and `rg -n -i "mcp" backend` has no source-code matches.
+
+### Task 3: Declarative Subagent Loader
+
+**Files:**
+- Create: `backend/src/agent/subagents/loader.py`, `backend/src/agent/subagents/configs/researcher.yaml`, `backend/tests/test_agent_loader.py`
+- Modify: `backend/src/api_view/agent_loader.py`, `backend/src/agent/main_agent.py`, `backend/pyproject.toml`, `backend/README.md`
+
+**Interfaces:**
+- `SubagentDefinition(name: str, description: str, system_prompt: str, model: str | None, tools: tuple[str, ...])`
+- `load_subagent_definitions(directory: Path) -> tuple[SubagentDefinition, ...]`
+- `AgentLoader.load_subagents() -> tuple[SubagentDefinition, ...]`
+
+- [ ] **Step 1: Write failing YAML-loader tests**
+
+```python
+def test_loader_reads_researcher_definition(config_directory: Path) -> None:
+    definitions = load_subagent_definitions(config_directory)
+    assert definitions[0].name == "researcher"
+    assert definitions[0].tools == ("web_search",)
+
+
+def test_loader_rejects_duplicate_subagent_names(config_directory: Path) -> None:
+    with pytest.raises(SubagentConfigurationError, match="Duplicate"):
+        load_subagent_definitions(config_directory)
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `uv run pytest tests/test_agent_loader.py -v`
+
+Expected: FAIL because the YAML loader does not yet exist.
+
+- [ ] **Step 3: Implement YAML parsing and integrate the application loader**
+
+```python
+def load_subagent_definitions(directory: Path) -> tuple[SubagentDefinition, ...]:
+    documents = tuple(_load_one(path) for path in sorted(directory.glob("*.yaml")))
+    _validate_unique_names(documents)
+    return documents
+```
+
+- [ ] **Step 4: Run focused and full verification**
+
+Run: `cmd /c "uv run pytest -v && uv run ruff check ."`
+
+Expected: all tests pass and Ruff reports no violations.

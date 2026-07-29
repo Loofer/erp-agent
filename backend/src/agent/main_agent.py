@@ -7,6 +7,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from .config import load_settings
+from .subagents.loader import SubagentDefinition
 from .tools.api_client import ApiClient
 from .tools.openapi import Operation, load_operation_catalog
 from .workflows.bi_query import build_bi_query_graph
@@ -70,8 +71,12 @@ def build_graph(
     return graph.compile()
 
 
-def build_default_graph() -> CompiledStateGraph:
+def build_default_graph(
+    subagents: tuple[SubagentDefinition, ...] = (),
+) -> CompiledStateGraph:
+    """Build the default graph from inert, already-validated definitions."""
     settings = load_settings()
     contract_path = Path(__file__).resolve().parents[2] / "openapi" / "swagger.json"
     catalog = load_operation_catalog(contract_path)
+    _ = subagents
     return build_graph(catalog, ApiClient(settings.api_base_url))
