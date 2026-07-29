@@ -47,6 +47,14 @@ class ApiClient:
         self, action: PendingAction
     ) -> dict[str, object]:
         """Send the one cataloged supplier action after HITL validation."""
+        if (
+            action.operation_name != CATALOGED_SUPPLIER_CREATE.name
+            or action.method != CATALOGED_SUPPLIER_CREATE.method
+            or action.path != CATALOGED_SUPPLIER_CREATE.path
+        ):
+            raise ApiClientError(
+                "Approved action must be the cataloged supplier create operation."
+            )
         return self._send(
             CATALOGED_SUPPLIER_CREATE,
             path_params={},
