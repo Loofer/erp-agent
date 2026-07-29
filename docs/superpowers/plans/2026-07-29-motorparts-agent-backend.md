@@ -1,0 +1,93 @@
+# Motor Parts Agent Backend Skeleton Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Create a runnable, tested backend skeleton with one read tool, one staged write tool, a HITL approval boundary, and an isolated future BI/Text2SQL subgraph boundary.
+
+**Architecture:** A top-level LangGraph routes explicit caller intent to `data_query`, `create`, `research`, or `bi_query`. The only active contract operations are `getDashboard` (`GET`) and `create` (`POST /api/suppliers/create`); the POST is staged, interrupted for approval, and then sent only on an approved resume.
+
+**Tech Stack:** Python 3.12, uv, FastAPI, LangGraph, Deep Agents, httpx, Pydantic, pytest, Ruff.
+
+## Global Constraints
+
+- Python version is `>=3.12`.
+- Copy root `swagger.json` to `backend/openapi/swagger.json` without changing the contract.
+- Expose only `getDashboard` as a read tool and `create` for supplier creation as a staged write tool.
+- Any HTTP operation other than `GET` must be staged and human-approved before execution.
+- `bi_query` is a standalone placeholder graph; it must not connect to a database or call an LLM.
+- Tests must use `httpx.MockTransport`; no test may contact the configured public API host.
+- Secrets come only from environment variables and are not committed.
+
+---
+
+### Task 1: Runnable Skeleton
+
+**Files:**
+- Create: `backend/pyproject.toml`, `backend/.env.example`, `backend/.gitignore`, `backend/README.md`, `backend/langgraph.json`
+- Create: `backend/openapi/swagger.json`
+- Create: `backend/src/motorparts_agent/{__init__,config,openapi,api_client,tools,actions,hitl,data_query,bi_query,research,graph,api}.py`
+- Create: `backend/tests/{conftest,test_openapi,test_api_client,test_data_query,test_hitl,test_bi_query,test_graph,test_api}.py`
+
+**Interfaces:**
+- `load_operation_catalog(path: Path) -> dict[str, Operation]`
+- `ApiClient.execute(operation: Operation, *, path_params: dict[str, object], query: dict[str, object], body: dict[str, object] | None) -> dict[str, object]`
+- `PendingAction(operation_name: str, method: str, path: str, query: dict[str, object], body: dict[str, object] | None)`
+- `build_graph(catalog: dict[str, Operation], client: ApiClient) -> CompiledStateGraph`
+
+- [ ] **Step 1: Write failing tests**
+
+```python
+def test_catalog_classifies_dashboard_and_supplier_create(catalog: dict[str, Operation]) -> None:
+    assert catalog["getDashboard"].is_mutation is False
+    assert catalog["create"].is_mutation is True
+
+
+def test_query_graph_rejects_supplier_create(catalog: dict[str, Operation]) -> None:
+    assert build_data_query_graph(catalog).invoke({"operation_name": "create"})["error"] == "Mutation operations are not available in data_query."
+
+
+def test_rejected_action_does_not_send_request(action: PendingAction, client: ApiClient) -> None:
+    assert execute_after_approval(action, False, client)["status"] == "rejected"
+
+
+def test_bi_graph_reports_not_configured() -> None:
+    assert build_bi_query_graph().invoke({"question": "monthly purchasing trend"})["status"] == "not_configured"
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `uv run pytest -v`
+
+Expected: FAIL because the package and test configuration do not exist.
+
+- [ ] **Step 3: Implement the smallest complete skeleton**
+
+```python
+def stage_create_supplier(payload: dict[str, object], catalog: dict[str, Operation]) -> PendingAction:
+    operation = catalog["create"]
+    return PendingAction(operation.name, operation.method, operation.path, {}, payload)
+
+
+def execute_query(state: QueryState, catalog: dict[str, Operation], client: ApiClient) -> QueryState:
+    operation = catalog[state["operation_name"]]
+    if operation.is_mutation:
+        return {"error": "Mutation operations are not available in data_query."}
+    return {"api_result": client.execute(operation, path_params={}, query={}, body=None)}
+```
+
+- [ ] **Step 4: Run focused and full verification**
+
+Run: `uv run pytest -v && uv run ruff check .`
+
+Expected: all tests pass and Ruff reports no violations.
+
+- [ ] **Step 5: Commit the initialized template**
+
+Run:
+
+```bash
+git add backend docs/superpowers
+git commit -m "feat: initialize motorparts agent backend"
+```
+
+Expected: one local commit containing the tested backend skeleton and its design records.
