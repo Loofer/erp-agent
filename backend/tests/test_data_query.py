@@ -1,5 +1,5 @@
-from motorparts_agent.data_query import build_data_query_graph
-from motorparts_agent.openapi import Operation
+from agent.tools.openapi import Operation
+from agent.workflows.data_query import build_data_query_graph
 
 
 def test_query_graph_rejects_supplier_create(catalog: dict[str, Operation]) -> None:

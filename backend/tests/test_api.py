@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from motorparts_agent.api import app
+from api_view.web_main import app
 
 
 def test_health_is_available_in_process() -> None:

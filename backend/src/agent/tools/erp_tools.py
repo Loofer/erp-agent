@@ -1,7 +1,7 @@
-"""The intentionally small set of active agent tools."""
+"""The intentionally small set of direct in-process ERP tools."""
 
-from .actions import PendingAction
-from .api_client import ApiClient
+from ..schema import PendingAction
+from .api_client import CATALOGED_SUPPLIER_CREATE, ApiClient
 from .openapi import Operation
 
 ACTIVE_READ_OPERATION = "getDashboard"
@@ -19,6 +19,6 @@ def stage_create_supplier(
 ) -> PendingAction:
     """Prepare supplier creation without performing network I/O."""
     operation = catalog[SUPPLIER_CREATE_OPERATION]
-    if not operation.is_mutation:
-        raise ValueError("Supplier creation operation must be a mutation.")
+    if operation != CATALOGED_SUPPLIER_CREATE:
+        raise ValueError("Supplier creation must use the cataloged create operation.")
     return PendingAction(operation.name, operation.method, operation.path, {}, payload)

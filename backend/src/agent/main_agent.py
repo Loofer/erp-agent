@@ -6,13 +6,13 @@ from typing import Literal, NotRequired, TypedDict
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from .api_client import ApiClient
-from .bi_query import build_bi_query_graph
 from .config import load_settings
-from .data_query import build_data_query_graph
-from .openapi import Operation, load_operation_catalog
-from .research import research_placeholder
-from .tools import stage_create_supplier
+from .tools.api_client import ApiClient
+from .tools.openapi import Operation, load_operation_catalog
+from .workflows.bi_query import build_bi_query_graph
+from .workflows.create import stage_supplier_creation
+from .workflows.data_query import build_data_query_graph
+from .workflows.research import research_placeholder
 
 Route = Literal["data_query", "create", "research", "bi_query"]
 
@@ -47,7 +47,7 @@ def build_graph(
         }
 
     def run_create(state: AgentState) -> dict[str, object]:
-        return {"pending_action": stage_create_supplier(state.get("payload", {}), catalog)}
+        return {"pending_action": stage_supplier_creation(state.get("payload", {}), catalog)}
 
     def run_research(state: AgentState) -> dict[str, str]:
         return research_placeholder(state.get("question", ""))

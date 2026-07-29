@@ -25,15 +25,13 @@ The checked contract contains 54 operations: 27 `GET` operations and 27 state-ch
 
 ## Components
 
-- `config.py`: typed environment configuration. `MOTORPARTS_API_BASE_URL` defaults to the OpenAPI server URL; no secret values are committed.
-- `openapi.py`: validates and loads the copied OpenAPI document, derives immutable operation metadata, and separates read from state-changing operations.
-- `api_client.py`: `httpx` client that interpolates validated path parameters, sends query parameters or JSON bodies, and raises domain-specific errors for non-success HTTP and API responses.
-- `tools.py`: exposes only `get_dashboard` and `stage_create_supplier`. The operation catalog supports later safe expansion from `swagger.json`.
-- `data_query.py`: a subgraph with `select_operation`, `execute_query`, and `summarize_result` nodes. It never calls a state-changing operation.
-- `create_agent.py` and `hitl.py`: create/update/delete intent plus interrupt/resume approval boundary.
-- `research.py`: isolated Deep Agents researcher configuration.
-- `bi_query.py`: a standalone `StateGraph` factory reserved for future Text2SQL/BI implementation; it has no database connection or LLM in this increment.
-- `api.py`: FastAPI health endpoint and a durable LangGraph-compatible request entry point.
+- `src/api_view/`: FastAPI application composition, graph lifecycle loading, and request routers.
+- `src/agent/`: the Deep Agents/LangGraph runtime boundary, configuration, schema, prompts, and middleware.
+- `src/agent/tools/`: ordinary in-process HTTP tools. This replaces the reference structure's MCP client and MCP server directories; no MCP protocol or MCP dependency is used.
+- `src/agent/workflows/data_query.py`: a subgraph that selects the cataloged `getDashboard` operation and never executes a mutation.
+- `src/agent/workflows/create.py` and `src/agent/middlewares/hitl.py`: supplier-creation staging plus interrupt/resume approval boundary.
+- `src/agent/workflows/bi_query.py`: a standalone `StateGraph` factory reserved for future Text2SQL/BI implementation; it has no database connection or LLM in this increment.
+- `src/agent/subagents/` and `skills/`: empty-but-documented extension points for later deep research specialists and progressive-disclosure operating instructions.
 
 ## Data Flow
 
@@ -62,3 +60,7 @@ The checked contract contains 54 operations: 27 `GET` operations and 27 state-ch
 ## Out Of Scope
 
 - Authentication design, frontend UI, persistence/checkpoint deployment, production web-search credentials, and automatic evaluation optimization. These can be layered onto this tested starter after the system authentication model and target deployment environment are known.
+
+## Layout
+
+The backend follows the supplied procurement-agent layout at the boundary level: `main.py` and `bootstrap.py` are startup points; `src/api_view` owns web transport; `src/agent` owns orchestration; `src/agent/tools` owns ordinary tools; `src/agent/workflows` owns explicit subgraphs; `skills`, `test`, `configs`, `data`, `logs`, and `scripts` are reserved project areas. The reference `mcp_server` and `mcp_client.py` are deliberately omitted.

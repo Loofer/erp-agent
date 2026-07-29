@@ -4,8 +4,8 @@ from pathlib import Path
 import httpx
 import pytest
 
-from motorparts_agent.api_client import ApiClient
-from motorparts_agent.openapi import Operation, load_operation_catalog
+from agent.tools.api_client import ApiClient
+from agent.tools.openapi import Operation, load_operation_catalog
 
 
 @pytest.fixture

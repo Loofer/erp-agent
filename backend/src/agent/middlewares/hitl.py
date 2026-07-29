@@ -4,9 +4,8 @@ from typing import Any
 
 from langgraph.types import interrupt
 
-from .actions import PendingAction
-from .api_client import ApiClient
-from .openapi import Operation
+from ..schema import PendingAction
+from ..tools.api_client import CATALOGED_SUPPLIER_CREATE, ApiClient
 
 
 def approval_payload(action: PendingAction) -> dict[str, object]:
@@ -30,11 +29,15 @@ def execute_after_approval(
     """Execute exactly one staged action only after an affirmative decision."""
     if not approved:
         return {"status": "rejected"}
-    operation = Operation(action.operation_name, action.method, action.path)
-    result = client.execute(
-        operation,
-        path_params={},
-        query=action.query,
-        body=action.body,
-    )
+    if not _is_cataloged_supplier_create(action):
+        return {"status": "rejected"}
+    result = client._send_approved_supplier_create(action)
     return {"status": "approved", "result": result}
+
+
+def _is_cataloged_supplier_create(action: PendingAction) -> bool:
+    return (
+        action.operation_name == CATALOGED_SUPPLIER_CREATE.name
+        and action.method == CATALOGED_SUPPLIER_CREATE.method
+        and action.path == CATALOGED_SUPPLIER_CREATE.path
+    )

@@ -1,4 +1,4 @@
-from motorparts_agent.openapi import Operation
+from agent.tools.openapi import Operation
 
 
 def test_catalog_classifies_dashboard_and_supplier_create(

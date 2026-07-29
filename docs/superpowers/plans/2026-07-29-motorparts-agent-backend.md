@@ -91,3 +91,52 @@ git commit -m "feat: initialize motorparts agent backend"
 ```
 
 Expected: one local commit containing the tested backend skeleton and its design records.
+
+### Task 2: Reference Layout And Tool-Only Boundary
+
+**Files:**
+- Move: `backend/src/motorparts_agent/*` to `backend/src/api_view/*` and `backend/src/agent/*` by responsibility.
+- Create: `backend/main.py`, `backend/bootstrap.py`, `backend/ARCH.md`, `backend/src/agent/tools/`, `backend/src/agent/workflows/`, `backend/src/agent/middlewares/`, `backend/src/agent/subagents/configs/`, `backend/skills/`, `backend/test/`, `backend/configs/`, `backend/data/`, `backend/logs/`, `backend/scripts/`.
+- Delete: `backend/src/motorparts_agent/` after all imports and tests move.
+
+**Interfaces:**
+- `api_view.web_main.app` is the FastAPI application.
+- `agent.main_agent.build_default_graph() -> CompiledStateGraph` builds the route graph.
+- `agent.tools.erp_tools.get_dashboard(...)` and `stage_create_supplier(...)` are ordinary in-process tools; no module may import MCP packages or start an MCP server.
+- `agent.workflows.bi_query.build_bi_query_graph() -> CompiledStateGraph` remains the future Text2SQL boundary.
+
+- [ ] **Step 1: Write or migrate failing safety and layout tests**
+
+```python
+def test_direct_mutation_is_rejected_without_http_request() -> None:
+    with pytest.raises(ApiClientError, match="must be staged and approved"):
+        client.execute(create_operation, path_params={}, query={}, body=payload)
+
+
+def test_staged_supplier_body_is_a_snapshot() -> None:
+    source = {"supplierCode": "S-001", "name": "Acme"}
+    action = stage_create_supplier(source, catalog)
+    source["name"] = "Changed"
+    assert action.body["name"] == "Acme"
+```
+
+- [ ] **Step 2: Run the tests to verify the current implementation fails**
+
+Run: `uv run pytest -v`
+
+Expected: the direct mutation and mutable-payload regression tests fail before the tool-only safety boundary exists.
+
+- [ ] **Step 3: Move modules into the supplied layout and enforce the tool-only safety boundary**
+
+```python
+def execute(self, operation: Operation, **kwargs: object) -> dict[str, object]:
+    if operation.is_mutation:
+        raise ApiClientError("Mutation operations must be staged and approved.")
+    return self._send(operation, **kwargs)
+```
+
+- [ ] **Step 4: Verify moved imports and complete suite**
+
+Run: `uv run pytest -v && uv run ruff check .`
+
+Expected: all tests pass, Ruff reports no violations, and `rg -n -i "mcp" backend` has no source-code matches.

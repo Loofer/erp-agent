@@ -1,4 +1,4 @@
-from motorparts_agent.bi_query import build_bi_query_graph
+from agent.workflows.bi_query import build_bi_query_graph
 
 
 def test_bi_graph_reports_not_configured() -> None:

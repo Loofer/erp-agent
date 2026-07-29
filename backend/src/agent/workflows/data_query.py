@@ -5,8 +5,8 @@ from typing import NotRequired, TypedDict
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from .api_client import ApiClient
-from .openapi import Operation
+from ..tools.api_client import ApiClient
+from ..tools.openapi import Operation
 
 
 class QueryState(TypedDict):

@@ -4,7 +4,12 @@ from typing import Any
 
 import httpx
 
+from ..schema import PendingAction
 from .openapi import Operation
+
+CATALOGED_SUPPLIER_CREATE = Operation(
+    "create", "POST", "/api/suppliers/create", requires_body=True
+)
 
 
 class ApiClientError(RuntimeError):
@@ -33,7 +38,31 @@ class ApiClient:
         query: dict[str, object],
         body: dict[str, object] | None,
     ) -> dict[str, object]:
-        """Send one already-authorized cataloged operation."""
+        """Send one cataloged read operation."""
+        if operation.is_mutation:
+            raise ApiClientError("Mutation operations must be staged and approved.")
+        return self._send(operation, path_params=path_params, query=query, body=body)
+
+    def _send_approved_supplier_create(
+        self, action: PendingAction
+    ) -> dict[str, object]:
+        """Send the one cataloged supplier action after HITL validation."""
+        return self._send(
+            CATALOGED_SUPPLIER_CREATE,
+            path_params={},
+            query=action.query,
+            body=action.body,
+        )
+
+    def _send(
+        self,
+        operation: Operation,
+        *,
+        path_params: dict[str, object],
+        query: dict[str, object],
+        body: dict[str, object] | None,
+    ) -> dict[str, object]:
+        """Perform a validated HTTP request for an authorized operation."""
         path = _render_path(operation, path_params)
         _validate_required(operation.required_query_params, query, "query")
         if operation.requires_body and body is None:
