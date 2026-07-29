@@ -1,0 +1,6 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "motorparts_agent": "./src/motorparts_agent/graph.py:build_default_graph"
+  }
+}
