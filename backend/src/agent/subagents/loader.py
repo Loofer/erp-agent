@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -96,3 +97,30 @@ def _validate_unique_names(definitions: tuple[SubagentDefinition, ...]) -> None:
                 f"Duplicate subagent definition name: {definition.name}"
             )
         names.add(definition.name)
+
+
+def to_deep_agent_subagents(
+    definitions: tuple[SubagentDefinition, ...],
+    tools_by_name: Mapping[str, object],
+) -> list[dict[str, Any]]:
+    """Convert validated YAML definitions to Deep Agents subagent dictionaries."""
+    subagents: list[dict[str, Any]] = []
+    for definition in definitions:
+        tools: list[object] = []
+        for tool_name in definition.tools:
+            try:
+                tools.append(tools_by_name[tool_name])
+            except KeyError as error:
+                raise SubagentConfigurationError(
+                    f"{definition.name} references unknown tool: {tool_name}"
+                ) from error
+        subagent: dict[str, Any] = {
+            "name": definition.name,
+            "description": definition.description,
+            "system_prompt": definition.system_prompt,
+            "tools": tools,
+        }
+        if definition.model is not None:
+            subagent["model"] = definition.model
+        subagents.append(subagent)
+    return subagents

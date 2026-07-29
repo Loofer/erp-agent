@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+import api_view.agent_loader as agent_loader_module
 from agent.subagents.loader import (
     SubagentConfigurationError,
     SubagentDefinition,
@@ -117,11 +118,14 @@ system_prompt: Gather evidence before responding.
     )
     events: list[str] = []
 
-    def graph_factory(definitions: tuple[SubagentDefinition, ...]) -> object:
-        events.append(definitions[0].name)
+    def agent_factory(
+        model: str, *, subagents: tuple[SubagentDefinition, ...]
+    ) -> object:
+        assert model == "test:model"
+        events.append(subagents[0].name)
         return object()
 
-    loader = AgentLoader(tmp_path, graph_factory)
+    loader = AgentLoader(tmp_path, agent_factory, model="test:model")
     graph = loader.load_agent_graph()
 
     assert graph is not None
@@ -145,3 +149,34 @@ def test_agent_loader_rejects_invalid_definitions_before_building_graph(
         loader.load_agent_graph()
 
     assert factory_calls == 0
+
+
+def test_deployment_target_loads_yaml_before_creating_main_agent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_definition(
+        tmp_path,
+        "researcher.yaml",
+        """name: researcher
+description: Investigates supplier and market questions.
+system_prompt: Gather evidence before responding.
+tools:
+  - web_search
+""",
+    )
+    captured: dict[str, object] = {}
+    expected_graph = object()
+
+    def fake_create_main_agent(
+        model: str, *, subagents: tuple[SubagentDefinition, ...]
+    ) -> object:
+        captured["model"] = model
+        captured["subagents"] = subagents
+        return expected_graph
+
+    monkeypatch.setattr(agent_loader_module, "create_main_agent", fake_create_main_agent)
+    loader = AgentLoader(tmp_path, model="test:model")
+
+    assert loader.load_agent_graph() is expected_graph
+    assert captured["model"] == "test:model"
+    assert captured["subagents"] == loader.load_subagents()

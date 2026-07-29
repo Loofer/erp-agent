@@ -4,7 +4,6 @@ from typing import Any
 
 import httpx
 
-from ..schema import PendingAction
 from .openapi import Operation
 
 CATALOGED_SUPPLIER_CREATE = Operation(
@@ -43,23 +42,13 @@ class ApiClient:
             raise ApiClientError("Mutation operations must be staged and approved.")
         return self._send(operation, path_params=path_params, query=query, body=body)
 
-    def _send_approved_supplier_create(
-        self, action: PendingAction
-    ) -> dict[str, object]:
-        """Send the one cataloged supplier action after HITL validation."""
-        if (
-            action.operation_name != CATALOGED_SUPPLIER_CREATE.name
-            or action.method != CATALOGED_SUPPLIER_CREATE.method
-            or action.path != CATALOGED_SUPPLIER_CREATE.path
-        ):
-            raise ApiClientError(
-                "Approved action must be the cataloged supplier create operation."
-            )
+    def _send_supplier_create(self, payload: dict[str, object]) -> dict[str, object]:
+        """Send the cataloged supplier mutation from the approved agent tool."""
         return self._send(
             CATALOGED_SUPPLIER_CREATE,
             path_params={},
-            query=action.query,
-            body=action.body,
+            query={},
+            body=payload,
         )
 
     def _send(

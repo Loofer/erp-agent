@@ -81,6 +81,52 @@ Run: `uv run pytest -v && uv run ruff check .`
 
 Expected: all tests pass and Ruff reports no violations.
 
+### Task 4: Deep Agents Primary Runtime
+
+**Files:**
+- Modify: `backend/pyproject.toml`, `backend/langgraph.json`, `backend/src/api_view/agent_loader.py`, `backend/src/agent/main_agent.py`, `backend/src/agent/config.py`, `backend/src/agent/subagents/loader.py`
+- Create: `backend/src/agent/tools/bi_tools.py`, `backend/src/agent/tools/research_tools.py`, `backend/src/agent/workflows/bi_text2sql.py`
+- Remove: hand-built top-level route graph, custom HITL execution sender, and generic data-query/create LangGraph workflows.
+
+**Interfaces:**
+- `create_main_agent(model: str, *, subagents: tuple[SubagentDefinition, ...], api_client: ApiClient | None = None) -> CompiledStateGraph`
+- `AgentLoader.load_agent_graph() -> CompiledStateGraph` loads YAML before calling `create_main_agent`.
+- `create_supplier` is a standard `@tool` in the Deep Agent's `interrupt_on` map.
+- Callers resume supplier approval with `Command(resume={"decisions": [{"type": "approve"}]})` for the same thread.
+
+- [ ] **Step 1: Write failing Deep Agents construction tests**
+
+```python
+def test_main_agent_uses_native_hitl_and_loaded_subagents(monkeypatch) -> None:
+    create_main_agent("anthropic:claude-sonnet-4-6", subagents=(researcher,))
+    assert captured["interrupt_on"] == {"create_supplier": True}
+    assert captured["subagents"][0]["name"] == "researcher"
+```
+
+- [ ] **Step 2: Verify the test fails before implementation**
+
+Run: `uv run pytest tests/test_main_agent.py -v`
+
+Expected: FAIL because the hand-built graph does not call `create_deep_agent`.
+
+- [ ] **Step 3: Replace the top-level graph with Deep Agents and retain LangGraph only for BI**
+
+```python
+return create_deep_agent(
+    model=model,
+    tools=[get_dashboard, create_supplier, run_bi_text2sql],
+    subagents=deepagents_subagents,
+    interrupt_on={"create_supplier": True},
+    checkpointer=InMemorySaver(),
+)
+```
+
+- [ ] **Step 4: Lock and verify compatible dependencies**
+
+Run: `uv add "deepagents>=0.6.12" "langgraph>=1.2.8" "langchain-core>=1.2" && uv sync && uv run pytest -v && uv run ruff check .`
+
+Expected: uv locks a compatible Deep Agents/LangGraph combination in `backend/uv.lock`; `deepagents` imports successfully, all tests pass, and Ruff reports no violations.
+
 - [ ] **Step 5: Commit the initialized template**
 
 Run:

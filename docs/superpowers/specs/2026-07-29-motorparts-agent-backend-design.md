@@ -6,41 +6,40 @@ Initialize a Python backend skeleton for an agent that serves the motor-parts pr
 
 ## Scope
 
-The first increment provides an executable LangGraph project with four explicit routes:
-
-- `data_query`: a deterministic subgraph that can invoke only read-only API tools.
-- `create`: an agent route that prepares state-changing API requests and interrupts for human approval before an HTTP request is sent.
-- `research`: a Deep Agents research route with a dedicated researcher subagent and an optional web-search provider.
-- `bi_query`: a reserved subgraph boundary for a future Text2SQL/BI workflow; it returns a configured-not-yet response in this increment.
+The first increment provides an executable Deep Agents project. The primary
+runtime receives one representative read tool, one human-approved supplier
+creation tool, one BI adapter, and a declarative research subagent. The BI
+adapter is the only dedicated LangGraph subgraph; it returns a
+configured-not-yet response in this increment.
 
 The checked contract contains 54 operations: 27 `GET` operations and 27 state-changing operations (`POST`, `PUT`, `PATCH`, and `DELETE`). The skeleton exposes exactly two operations: `getDashboard` as the representative read tool and `create` (`POST /api/suppliers/create`) as the representative mutation. The catalog still classifies all operations so later tools can be added safely. `GET` operations are query tools. Every other operation is a pending-action tool and requires explicit human approval.
 
 ## Architecture
 
-`src/motorparts_agent/graph.py` owns the top-level `StateGraph` and routes a request through a structured classifier. It delegates data access to `data_query.py`, a focused subgraph that selects a cataloged read operation, validates tool arguments, executes the HTTP request, and returns normalized API data.
+`agent/main_agent.py` builds the primary runtime with `deepagents.create_deep_agent`. It owns the orchestration prompt, ordinary ERP tools, declarative YAML subagents, an `InMemorySaver` checkpointer for development, and Deep Agents-native `interrupt_on={"create_supplier": True}` HITL. It replaces the former top-level routing `StateGraph`.
 
-`create_agent.py` owns a write-only tool catalog. Its representative supplier-creation tool generates a `PendingAction` object rather than making an HTTP request. `hitl.py` calls LangGraph `interrupt` with the exact method, path, request body, and summary. A resumed run with `approved=True` invokes `ApiClient`; a rejected action returns a terminal response without sending a request.
+`agent/tools/` contains ordinary LangChain `@tool` functions. `get_dashboard` performs the representative read request; `create_supplier` is the representative mutation, which Deep Agents interrupts before execution. The API client keeps raw mutation transport private to these tool closures. There is no custom approval graph or public approval-sender function.
 
-`research.py` wraps a Deep Agent with a scoped researcher subagent. Web search is optional and disabled unless its provider configuration is present. Research has no access to the motor-parts write tools.
+`agent/subagents/loader.py` converts YAML definitions into Deep Agents subagent dictionaries, including the declared research `web_search` ordinary tool. Research has no ERP write tool.
 
 ## Components
 
 - `src/api_view/`: FastAPI application composition, graph lifecycle loading, and request routers.
-- `src/agent/`: the Deep Agents/LangGraph runtime boundary, configuration, schema, prompts, and middleware.
+- `src/agent/`: the Deep Agents runtime boundary, configuration, schema, prompts, tool registry, and declarative subagents.
 - `src/agent/tools/`: ordinary in-process HTTP tools. This replaces the reference structure's MCP client and MCP server directories; no MCP protocol or MCP dependency is used.
-- `src/agent/workflows/data_query.py`: a subgraph that selects the cataloged `getDashboard` operation and never executes a mutation.
-- `src/agent/workflows/create.py` and `src/agent/middlewares/hitl.py`: supplier-creation staging plus interrupt/resume approval boundary.
-- `src/agent/workflows/bi_query.py`: a standalone `StateGraph` factory reserved for future Text2SQL/BI implementation; it has no database connection or LLM in this increment.
+- `src/agent/tools/erp_tools.py`: representative `get_dashboard` and `create_supplier` Deep Agent tools.
+- `src/agent/tools/bi_tools.py`: adapts the BI graph into one normal Deep Agent tool.
+- `src/agent/workflows/bi_text2sql.py`: the only domain `StateGraph`, reserved for future Text2SQL/BI implementation; it has no database connection or LLM in this increment.
 - `src/agent/subagents/loader.py`: parses and validates declarative YAML subagent definitions into immutable `SubagentDefinition` values. `api_view/agent_loader.py` loads those definitions before building the main graph; model/tool instantiation remains deferred.
 - `src/agent/subagents/configs/researcher.yaml` and `skills/`: a starter deep-research specialist definition and progressive-disclosure operating instructions.
 
 ## Data Flow
 
 1. The HTTP API receives a request, `thread_id`, and optional runtime configuration.
-2. The top-level graph selects `data_query`, `create`, or `research`.
-3. `data_query` executes only `GET` metadata. `create` stages a mutation and yields an interrupt. `research` delegates to its researcher with no business-system write tools.
-4. The caller resumes a create thread with `{ "approved": true }` or `{ "approved": false }`. Only an approved resume makes the configured HTTP request.
-5. Responses preserve API payloads under typed state fields and return a user-facing summary separately.
+2. `AgentLoader` reads YAML subagent definitions and calls `create_deep_agent` with the configured model, ordinary tools, loaded subagents, skills, a checkpointer, and native `interrupt_on` rules.
+3. The Deep Agent chooses read, research, create, or BI tools. BI is the only tool implemented as a dedicated LangGraph subgraph.
+4. A `create_supplier` tool call interrupts through Deep Agents' HITL middleware. The caller resumes the same thread with `Command(resume={"decisions": [{"type": "approve"}]})`; only that approved decision invokes the configured HTTP request.
+5. The runtime preserves tool results in its conversation state and returns the agent response separately.
 
 ## Error Handling And Safety
 
@@ -54,9 +53,10 @@ The checked contract contains 54 operations: 27 `GET` operations and 27 state-ch
 ## Testing
 
 - Unit-test OpenAPI classification, parameter rendering, client error normalization, and write-action staging without network access.
-- Unit-test the data-query subgraph to prove it rejects mutation operations.
-- Unit-test HITL approval and rejection: rejection sends no HTTP request, approval sends exactly one request with the staged method/path/body.
+- Unit-test native Deep Agent construction: loaded subagents are passed in, `create_supplier` is declared in `interrupt_on`, and a checkpointer is configured.
+- Unit-test ordinary tool closures and BI graph adapter without contacting external services.
 - Use `pytest` and `httpx.MockTransport`; no test contacts `47.92.108.163`.
+- Lock `deepagents>=0.6.12` and `langgraph>=1.2.8` in the backend's own uv environment; never rely on the root virtual environment.
 
 ## Out Of Scope
 
@@ -64,4 +64,4 @@ The checked contract contains 54 operations: 27 `GET` operations and 27 state-ch
 
 ## Layout
 
-The backend follows the supplied procurement-agent layout at the boundary level: `main.py` and `bootstrap.py` are startup points; `src/api_view` owns web transport; `src/agent` owns orchestration; `src/agent/tools` owns ordinary tools; `src/agent/workflows` owns explicit subgraphs; `skills`, `test`, `configs`, `data`, `logs`, and `scripts` are reserved project areas. The reference `mcp_server` and `mcp_client.py` are deliberately omitted.
+The backend follows the supplied procurement-agent layout at the boundary level: `main.py` and `bootstrap.py` are startup points; `src/api_view` owns web transport; `src/agent` owns Deep Agents orchestration; `src/agent/tools` owns ordinary tools; `src/agent/workflows/bi_text2sql.py` owns the sole explicit LangGraph subgraph; `skills`, `test`, `configs`, `data`, `logs`, and `scripts` are reserved project areas. The reference `mcp_server` and `mcp_client.py` are deliberately omitted.

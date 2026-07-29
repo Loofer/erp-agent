@@ -1,82 +1,46 @@
-"""Top-level route graph for the motor-parts agent."""
+"""Deep Agents runtime construction for the motor-parts agent."""
 
 from pathlib import Path
-from typing import Literal, NotRequired, TypedDict
 
-from langgraph.graph import END, START, StateGraph
+import deepagents
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph.state import CompiledStateGraph
 
 from .config import load_settings
-from .subagents.loader import SubagentDefinition
+from .subagents.loader import SubagentDefinition, to_deep_agent_subagents
 from .tools.api_client import ApiClient
-from .tools.openapi import Operation, load_operation_catalog
-from .workflows.bi_query import build_bi_query_graph
-from .workflows.create import stage_supplier_creation
-from .workflows.data_query import build_data_query_graph
-from .workflows.research import research_placeholder
+from .tools.bi_tools import run_bi_text2sql
+from .tools.erp_tools import build_erp_tools
+from .tools.openapi import load_operation_catalog
+from .tools.research_tools import web_search
 
-Route = Literal["data_query", "create", "research", "bi_query"]
-
-
-class AgentState(TypedDict):
-    route: Route
-    operation_name: NotRequired[str]
-    payload: NotRequired[dict[str, object]]
-    question: NotRequired[str]
-    status: NotRequired[str]
-    message: NotRequired[str]
-    error: NotRequired[str]
-    api_result: NotRequired[dict[str, object]]
-    pending_action: NotRequired[object]
+SYSTEM_PROMPT = (
+    "You are a motor-parts procurement assistant. Use only the provided tools "
+    "for ERP data and explain when a capability is not configured."
+)
 
 
-def build_graph(
-    catalog: dict[str, Operation], client: ApiClient
+def create_main_agent(
+    model: str,
+    *,
+    subagents: tuple[SubagentDefinition, ...],
+    api_client: ApiClient | None = None,
 ) -> CompiledStateGraph:
-    """Route explicit caller intent to one isolated capability."""
-    graph = StateGraph(AgentState)
-    data_query = build_data_query_graph(catalog, client)
-    bi_query = build_bi_query_graph()
-
-    def run_data_query(state: AgentState) -> dict[str, object]:
-        operation_name = state.get("operation_name", "getDashboard")
-        result = data_query.invoke({"operation_name": operation_name})
-        return {
-            key: value
-            for key, value in result.items()
-            if key in {"api_result", "error"}
-        }
-
-    def run_create(state: AgentState) -> dict[str, object]:
-        return {"pending_action": stage_supplier_creation(state.get("payload", {}), catalog)}
-
-    def run_research(state: AgentState) -> dict[str, str]:
-        return research_placeholder(state.get("question", ""))
-
-    def run_bi_query(state: AgentState) -> dict[str, str]:
-        result = bi_query.invoke({"question": state.get("question", "")})
-        return {
-            key: value
-            for key, value in result.items()
-            if key in {"status", "message"}
-        }
-
-    graph.add_node("data_query", run_data_query)
-    graph.add_node("create", run_create)
-    graph.add_node("research", run_research)
-    graph.add_node("bi_query", run_bi_query)
-    graph.add_conditional_edges(START, lambda state: state["route"])
-    for route in ("data_query", "create", "research", "bi_query"):
-        graph.add_edge(route, END)
-    return graph.compile()
-
-
-def build_default_graph(
-    subagents: tuple[SubagentDefinition, ...] = (),
-) -> CompiledStateGraph:
-    """Build the default graph from inert, already-validated definitions."""
+    """Build the primary Deep Agents runtime from declarative configuration."""
     settings = load_settings()
     contract_path = Path(__file__).resolve().parents[2] / "openapi" / "swagger.json"
     catalog = load_operation_catalog(contract_path)
-    _ = subagents
-    return build_graph(catalog, ApiClient(settings.api_base_url))
+    client = api_client or ApiClient(settings.api_base_url)
+    tools = [*build_erp_tools(catalog, client), run_bi_text2sql]
+    deep_agent_subagents = to_deep_agent_subagents(
+        subagents,
+        {"web_search": web_search},
+    )
+    return deepagents.create_deep_agent(
+        model=model,
+        tools=tools,
+        system_prompt=SYSTEM_PROMPT,
+        subagents=deep_agent_subagents,
+        interrupt_on={"create_supplier": True},
+        checkpointer=InMemorySaver(),
+    )

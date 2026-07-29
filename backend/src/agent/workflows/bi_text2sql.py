@@ -6,17 +6,17 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 
-class BiQueryState(TypedDict):
+class BiText2SqlState(TypedDict):
     question: NotRequired[str]
     status: NotRequired[str]
     message: NotRequired[str]
 
 
-def build_bi_query_graph() -> CompiledStateGraph:
-    """Return a standalone placeholder that cannot connect to a DB or LLM."""
-    graph = StateGraph(BiQueryState)
+def build_bi_text2sql_graph() -> CompiledStateGraph:
+    """Return a placeholder graph that cannot connect to a database or LLM."""
+    graph = StateGraph(BiText2SqlState)
 
-    def not_configured(state: BiQueryState) -> dict[str, str]:
+    def not_configured(state: BiText2SqlState) -> dict[str, str]:
         return {
             "status": "not_configured",
             "message": "BI query is not configured.",
