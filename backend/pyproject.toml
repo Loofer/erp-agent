@@ -11,7 +11,12 @@ dependencies = [
     "langchain-core>=1.2",
     "langchain-openai>=1.0",
     "langgraph>=1.2.8",
+    "langgraph-checkpoint-postgres>=3.1.1",
+    "psycopg[binary]>=3.3.4",
+    "pydantic-settings>=2.14.2",
     "PyYAML>=6,<7",
+    "sse-starlette>=3.4.6",
+    "pydantic-settings>=2.14.2"
 ]
 
 [build-system]

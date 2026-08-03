@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from agent.tools.api_client import ApiClient, ApiClientError
+from agent.tools.http_base import ApiClient, ApiClientError
 from agent.tools.openapi import Operation
 
 

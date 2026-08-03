@@ -1,1 +1,1 @@
-"""Reserved memory extension boundary."""
+"""Prompt and future memory boundaries for the Deep Agents runtime."""

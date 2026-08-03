@@ -1,0 +1,8 @@
+/deepagents
+
+# IDE
+.idea/
+.vscode/
+
+# AI tools
+.codex/

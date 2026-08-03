@@ -1,46 +1,92 @@
 """Deep Agents runtime construction for the motor-parts agent."""
 
 from pathlib import Path
+import logging
 
 import deepagents
-from langgraph.checkpoint.memory import InMemorySaver
+from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.store.base import BaseStore
 
 from .config import load_settings
-from .subagents.loader import SubagentDefinition, to_deep_agent_subagents
-from .tools.api_client import ApiClient
+from .memory.prompts import build_system_prompt
+from .memory.runtime import (
+    GLOBAL_SKILL_SOURCES,
+    MEMORY_PATH,
+    PERSISTENT_MEMORY_PATH,
+    MemoryContext,
+    build_agent_backend,
+    build_runtime_permissions,
+)
+from .subagents.loader import (
+    SubagentDefinition,
+    load_subagent_definitions,
+    to_deep_agent_subagents,
+)
+from .tools import build_parent_tools, build_subagent_only_tools
 from .tools.bi_tools import run_bi_text2sql
-from .tools.erp_tools import build_erp_tools
+from .tools.http_base import ApiClient
 from .tools.openapi import load_operation_catalog
 from .tools.research_tools import web_search
 
-SYSTEM_PROMPT = (
-    "You are a motor-parts procurement assistant. Use only the provided tools "
-    "for ERP data and explain when a capability is not configured."
-)
-
 
 def create_main_agent(
-    model: str,
-    *,
-    subagents: tuple[SubagentDefinition, ...],
-    api_client: ApiClient | None = None,
+        model: ChatOpenAI,
+        *,
+        subagents: tuple[SubagentDefinition, ...],
+        checkpointer: BaseCheckpointSaver | None = None,
+        store: BaseStore | None = None,
 ) -> CompiledStateGraph:
     """Build the primary Deep Agents runtime from declarative configuration."""
     settings = load_settings()
     contract_path = Path(__file__).resolve().parents[2] / "openapi" / "swagger.json"
     catalog = load_operation_catalog(contract_path)
-    client = api_client or ApiClient(settings.api_base_url)
-    tools = [*build_erp_tools(catalog, client), run_bi_text2sql]
-    deep_agent_subagents = to_deep_agent_subagents(
-        subagents,
-        {"web_search": web_search},
-    )
+    client = ApiClient(settings.api_base_url)
+
+    parent_tools = [*build_parent_tools(catalog, client), run_bi_text2sql]
+
+    subagent_tools = [*build_subagent_only_tools(catalog, client), web_search]
+
+    tools_by_name = {
+        tool.name: tool for tool in [*parent_tools, *subagent_tools]
+    }
+
+    deep_agent_subagents = to_deep_agent_subagents(subagents, tools_by_name)
     return deepagents.create_deep_agent(
         model=model,
-        tools=tools,
-        system_prompt=SYSTEM_PROMPT,
+        tools=parent_tools,
+        system_prompt=build_system_prompt(),
         subagents=deep_agent_subagents,
-        interrupt_on={"create_supplier": True},
-        checkpointer=InMemorySaver(),
+        skills=GLOBAL_SKILL_SOURCES,
+        memory=[MEMORY_PATH, PERSISTENT_MEMORY_PATH],
+        backend=build_agent_backend(),
+        debug=settings.debug,
+        permissions=build_runtime_permissions(),
+        checkpointer=checkpointer,
+        store=store,
+        context_schema=MemoryContext,
+    )
+
+
+def load_agent_graph(
+        checkpointer: BaseCheckpointSaver | None = None,
+        store: BaseStore | None = None,
+) -> CompiledStateGraph:
+    """Load YAML subagents and build the deployment graph."""
+    settings = load_settings()
+    model = ChatOpenAI(
+        model=settings.model,
+        api_key=settings.api_key,
+        base_url=settings.base_url,
+
+    )
+
+    config_directory = Path(__file__).parent / "subagents" / "configs"
+    subagents = load_subagent_definitions(config_directory)
+    return create_main_agent(
+        model,
+        subagents=subagents,
+        checkpointer=checkpointer,
+        store=store,
     )

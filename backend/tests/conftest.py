@@ -4,7 +4,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from agent.tools.api_client import ApiClient
+from agent.tools.http_base import ApiClient
 from agent.tools.openapi import Operation, load_operation_catalog
 
 

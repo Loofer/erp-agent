@@ -1,0 +1,14 @@
+name: procurement_order
+description: Collects missing order details and prepares a reviewed procurement-order draft.
+system_prompt: Verify the order details, request human completion for missing fields, and do not claim an order API action has been executed.
+tools:
+  - web_search
+  - request_order_info
+interrupt_on:
+  request_order_info:
+    allowed_decisions:
+      - approve
+      - edit
+      - reject
+skills:
+  - /skills/order/

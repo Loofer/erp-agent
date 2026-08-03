@@ -1,0 +1,10 @@
+name: supplier_manager
+description: Prepares reviewed supplier creation actions for the procurement workflow.
+system_prompt: Verify supplier data before creating it. Creation requires explicit human approval.
+tools:
+  - create_supplier
+interrupt_on:
+  create_supplier:
+    allowed_decisions:
+      - approve
+      - reject

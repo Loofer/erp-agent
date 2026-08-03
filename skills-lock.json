@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "langchain-dev-guide": {
+      "source": "ob-labs/agentseek",
+      "sourceType": "github",
+      "skillPath": "skills/langchain-dev-guide/SKILL.md",
+      "computedHash": "3b5abe916616b23ff7f00fe98119a44433f91715500199270704ef1c0a5fd94b"
+    },
+    "langsmith-trace": {
+      "source": "ob-labs/agentseek",
+      "sourceType": "github",
+      "skillPath": "skills/langsmith-trace/SKILL.md",
+      "computedHash": "e4d2d4f9b3d50ca409c9923022be04ea22562e662935af7f3d75ccc649f90c91"
+    }
+  }
+}

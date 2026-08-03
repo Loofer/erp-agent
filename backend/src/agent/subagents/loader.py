@@ -1,11 +1,11 @@
 """Validated declarative configuration for subagents."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 import yaml
+from deepagents import SubAgent
 
 
 @dataclass(frozen=True)
@@ -17,6 +17,8 @@ class SubagentDefinition:
     system_prompt: str
     model: str | None
     tools: tuple[str, ...]
+    interrupt_on: dict[str, bool | dict[str, list[str]]] = field(default_factory=dict)
+    skills: tuple[str, ...] = ()
 
 
 class SubagentConfigurationError(ValueError):
@@ -51,7 +53,9 @@ def _load_definition(path: Path) -> SubagentDefinition:
     system_prompt = _required_string(document, "system_prompt", path)
     model = _optional_string(document, "model", path)
     tools = _tools(document, path)
-    return SubagentDefinition(name, description, system_prompt, model, tools)
+    interrupt_on = _interrupt_on(document, path)
+    skills = _skills(document, path)
+    return SubagentDefinition(name, description, system_prompt, model, tools, interrupt_on, skills)
 
 
 def _required_string(document: Mapping[object, object], field: str, path: Path) -> str:
@@ -81,6 +85,55 @@ def _tools(document: Mapping[object, object], path: Path) -> tuple[str, ...]:
     )
 
 
+def _interrupt_on(
+    document: Mapping[object, object], path: Path
+) -> dict[str, bool | dict[str, list[str]]]:
+    if "interrupt_on" not in document:
+        return {}
+
+    value = document["interrupt_on"]
+    if not isinstance(value, Mapping):
+        raise SubagentConfigurationError(
+            f"{path.name} field 'interrupt_on' must be a mapping."
+        )
+
+    parsed: dict[str, bool | dict[str, list[str]]] = {}
+    for tool_name, config in value.items():
+        name = _non_empty_string(tool_name, "interrupt_on tool name", path)
+        if isinstance(config, bool):
+            parsed[name] = config
+            continue
+        if not isinstance(config, Mapping):
+            raise SubagentConfigurationError(
+                f"{path.name} interrupt_on '{name}' must be a boolean or mapping."
+            )
+        decisions = config.get("allowed_decisions")
+        if not isinstance(decisions, list) or not decisions:
+            raise SubagentConfigurationError(
+                f"{path.name} interrupt_on '{name}' needs allowed_decisions."
+            )
+        parsed[name] = {
+            "allowed_decisions": [
+                _non_empty_string(decision, f"interrupt_on {name} decision", path)
+                for decision in decisions
+            ]
+        }
+    return parsed
+
+
+def _skills(document: Mapping[object, object], path: Path) -> tuple[str, ...]:
+    if "skills" not in document:
+        return ()
+
+    value = document["skills"]
+    if not isinstance(value, list):
+        raise SubagentConfigurationError(f"{path.name} field 'skills' must be a list.")
+    return tuple(
+        _non_empty_string(skill, f"skills[{index}]", path)
+        for index, skill in enumerate(value)
+    )
+
+
 def _non_empty_string(value: object, field: str, path: Path) -> str:
     if not isinstance(value, str) or not value.strip():
         raise SubagentConfigurationError(
@@ -98,13 +151,12 @@ def _validate_unique_names(definitions: tuple[SubagentDefinition, ...]) -> None:
             )
         names.add(definition.name)
 
-
 def to_deep_agent_subagents(
     definitions: tuple[SubagentDefinition, ...],
     tools_by_name: Mapping[str, object],
-) -> list[dict[str, Any]]:
-    """Convert validated YAML definitions to Deep Agents subagent dictionaries."""
-    subagents: list[dict[str, Any]] = []
+) -> list[SubAgent]:
+    """Convert validated YAML definitions to Deep Agents SubAgent instances."""
+    subagents: list[SubAgent] = []
     for definition in definitions:
         tools: list[object] = []
         for tool_name in definition.tools:
@@ -114,13 +166,22 @@ def to_deep_agent_subagents(
                 raise SubagentConfigurationError(
                     f"{definition.name} references unknown tool: {tool_name}"
                 ) from error
-        subagent: dict[str, Any] = {
-            "name": definition.name,
-            "description": definition.description,
-            "system_prompt": definition.system_prompt,
-            "tools": tools,
-        }
+
+        sub_agent = SubAgent(
+            name=definition.name,
+            description=definition.description,
+            system_prompt=definition.system_prompt,
+            tools=tools,
+            interrupt_on=definition.interrupt_on or None,
+            skills=list(definition.skills) if definition.skills else None,
+        )
+        # Only set `model` when explicitly configured.  SubAgent is a TypedDict
+        # (plain dict), so spec.get("model", parent_model) in deepagents' graph
+        # falls back to the parent model when the key is absent.  Passing
+        # model=None keeps the key present with a None value, which causes
+        # resolve_model(None) → init_chat_model(None) → _ConfigurableModel and
+        # a subsequent TypeError in create_summarization_middleware.
         if definition.model is not None:
-            subagent["model"] = definition.model
-        subagents.append(subagent)
+            sub_agent["model"] = definition.model
+        subagents.append(sub_agent)
     return subagents
