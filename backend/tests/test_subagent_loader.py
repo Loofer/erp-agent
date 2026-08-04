@@ -44,8 +44,11 @@ def test_shipped_subagent_definitions_cover_research_analysis_and_order() -> Non
 
     assert [(definition.name, definition.tools) for definition in definitions] == [
         ("procurement_analyst", ("get_dashboard", "run_bi_text2sql")),
-        ("procurement_order", ("request_order_info",)),
-        ("supplier_manager", ("create_supplier", "search_suppliers")),
+        ("procurement_order", ("request_order_info", "create_order", "update_order")),
+        (
+            "supplier_manager",
+            ("create_supplier", "search_suppliers", "request_supplier_info"),
+        ),
     ]
     order_definition = next(
         definition for definition in definitions if definition.name == "procurement_order"
@@ -54,13 +57,22 @@ def test_shipped_subagent_definitions_cover_research_analysis_and_order() -> Non
     assert order_definition.interrupt_on == {
         "request_order_info": {
             "allowed_decisions": ["approve", "edit", "reject"],
-        }
+        },
+        "create_order": {
+            "allowed_decisions": ["approve", "reject"],
+        },
+        "update_order": {
+            "allowed_decisions": ["approve", "reject"],
+        },
     }
     supplier_definition = next(
         definition for definition in definitions if definition.name == "supplier_manager"
     )
     assert supplier_definition.interrupt_on == {
-        "create_supplier": {"allowed_decisions": ["approve", "reject"]}
+        "request_supplier_info": {
+            "allowed_decisions": ["approve", "edit", "reject"],
+        },
+        "create_supplier": {"allowed_decisions": ["approve", "reject"]},
     }
 
 

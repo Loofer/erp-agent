@@ -64,3 +64,7 @@ class ApiClient:
     def post(self, path: str, body: dict[str, object]) -> dict[str, object]:
         """Send a JSON POST request."""
         return self.request("POST", path, body=body)
+
+    def put(self, path: str, body: dict[str, object]) -> dict[str, object]:
+        """Send a JSON PUT request."""
+        return self.request("PUT", path, body=body)

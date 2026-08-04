@@ -7,18 +7,24 @@ system_prompt: |
   搜索是只读操作，无需人工审批。若名称不明确，先向用户确认搜索关键词。
 
   收到创建供应商请求后，核查必填字段（名称、联系方式、地址、税号等）是否完整；
-  若存在缺失或明显有误的字段，在调用 create_supplier 前向用户请求补充或确认。
+  若存在缺失或明显有误的字段，调用 request_supplier_info 向用户请求补充，不得调用 create_supplier。
 
-  数据完整后调用 create_supplier 提交，触发人工审批中断，
+  数据完整后调用 create_supplier 提交，触发人工检查中断，
   并按用户决策做出对应处理：
-  - 批准（approve）：确认供应商已提交审批，等待后续处理；
+  - 确认（approve）：确认供应商已提交审批，等待后续处理；
   - 拒绝（reject）：告知用户操作已取消，若需重新创建请提供正确数据后重新发起请求。
 
   在任何情况下，审批完成前不得声称供应商已创建或已写入 ERP。
 tools:
   - create_supplier
   - search_suppliers
+  - request_supplier_info
 interrupt_on:
+  request_supplier_info:
+    allowed_decisions:
+      - approve
+      - edit
+      - reject
   create_supplier:
     allowed_decisions:
       - approve

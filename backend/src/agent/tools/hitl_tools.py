@@ -28,6 +28,30 @@ def request_order_info(
     }
 
 
+@tool(parse_docstring=True)
+def request_supplier_info(
+    supplier_draft: dict[str, Any], missing_fields: list[str]
+) -> dict[str, object]:
+    """Request human completion of missing supplier data.
+
+    The native Deep Agents approval middleware pauses this tool call. An
+    approver can edit ``supplier_draft`` before approval to supply missing
+    values.
+
+    Args:
+        supplier_draft: Current supplier data, including fields under review.
+        missing_fields: Required supplier fields that need human confirmation.
+
+    Returns:
+        The reviewed supplier draft and its requested missing fields.
+    """
+    return {
+        "status": "human_input_requested",
+        "supplier_draft": dict(supplier_draft),
+        "missing_fields": list(missing_fields),
+    }
+
+
 def build_hitl_tools() -> list[BaseTool]:
     """Return normal tools whose calls require native human intervention."""
-    return [request_order_info]
+    return [request_order_info, request_supplier_info]
