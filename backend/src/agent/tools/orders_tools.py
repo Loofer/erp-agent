@@ -4,5 +4,5 @@ from langchain_core.tools import BaseTool
 
 
 def build_order_tools() -> list[BaseTool]:
-    """Return no tools until an order Swagger operation is explicitly approved."""
+    """Return no order tools until the domain is implemented."""
     return []

@@ -1,14 +1,28 @@
 name: procurement_order
-description: Collects missing order details and prepares a reviewed procurement-order draft.
-system_prompt: Verify the order details, request human completion for missing fields, and do not claim an order API action has been executed.
+description: 负责采购订单管理；当前支持创建采购订单——补全草稿字段后触发人工审批中断，等待批准、编辑或拒绝，审批完成前不得声称订单已写入 ERP。
+system_prompt: |
+  你负责采购订单管理，当前支持创建采购订单。
+
+  收到创建订单请求后，核查草稿中的必填字段是否完整；
+  若存在缺失字段，调用 request_order_info 向用户请求补充，
+
+  字段完整后调用 request_order_info 提交草稿，触发人工审批中断，
+  并按用户决策做出对应处理：
+  - 批准（approve）：确认草稿已提交，等待后续处理；
+  - 拒绝（reject）：告知用户订单已取消，不执行任何 ERP 写入操作。
+
+  在任何情况下，审批完成前不得声称订单已创建、已提交或已写入 ERP。
 tools:
-  - web_search
   - request_order_info
 interrupt_on:
-  request_order_info:
+  order_create:
     allowed_decisions:
       - approve
-      - edit
       - reject
+  order_update:
+    allowed_decisions:
+      - approve
+      - reject
+
 skills:
   - /skills/order/

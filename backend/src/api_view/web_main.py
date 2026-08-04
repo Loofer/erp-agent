@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
             conversations = ConversationRepository(checkpointer.conn)
             await conversations.setup()
 
-            _log.info("Initialising agent graph …")
+            _log.info("Initialising agent graph......")
             graph = load_agent_graph(checkpointer=checkpointer, store=store)
             _log.info("Agent graph ready.")
 

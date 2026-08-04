@@ -2,10 +2,9 @@ import httpx
 import pytest
 
 from agent.tools.http_base import ApiClient, ApiClientError
-from agent.tools.openapi import Operation
 
 
-def test_execute_dashboard_uses_the_cataloged_get_operation() -> None:
+def test_request_sends_a_get_request() -> None:
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -13,9 +12,7 @@ def test_execute_dashboard_uses_the_cataloged_get_operation() -> None:
         return httpx.Response(200, json={"code": 200, "data": {"orders": 4}})
 
     client = ApiClient("https://motorparts.test", transport=httpx.MockTransport(handler))
-    operation = Operation("getDashboard", "GET", "/api/statistics/dashboard")
-
-    assert client.execute(operation, path_params={}, query={}, body=None) == {
+    assert client.get("/api/statistics/dashboard") == {
         "code": 200,
         "data": {"orders": 4},
     }
@@ -24,7 +21,7 @@ def test_execute_dashboard_uses_the_cataloged_get_operation() -> None:
     ]
 
 
-def test_execute_rejects_direct_mutation_without_sending_a_request() -> None:
+def test_request_sends_a_post_request_with_json_body() -> None:
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -32,14 +29,22 @@ def test_execute_rejects_direct_mutation_without_sending_a_request() -> None:
         return httpx.Response(200, json={"code": 200, "data": {}})
 
     client = ApiClient("https://motorparts.test", transport=httpx.MockTransport(handler))
-    operation = Operation("create", "POST", "/api/suppliers/create")
+    assert client.post(
+        "/api/suppliers/create",
+        {"supplierCode": "S-001", "name": "Acme Parts"},
+    ) == {"code": 200, "data": {}}
+    assert [(request.method, request.url.path) for request in requests] == [
+        ("POST", "/api/suppliers/create")
+    ]
 
-    with pytest.raises(ApiClientError, match="must be staged and approved"):
-        client.execute(
-            operation,
-            path_params={},
-            query={},
-            body={"supplierCode": "S-001", "name": "Acme Parts"},
-        )
 
-    assert requests == []
+def test_request_rejects_non_object_responses() -> None:
+    client = ApiClient(
+        "https://motorparts.test",
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, json=["unexpected"])
+        ),
+    )
+
+    with pytest.raises(ApiClientError, match="was not an object"):
+        client.get("/api/statistics/dashboard")

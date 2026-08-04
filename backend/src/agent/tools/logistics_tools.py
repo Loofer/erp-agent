@@ -4,5 +4,5 @@ from langchain_core.tools import BaseTool
 
 
 def build_logistics_tools() -> list[BaseTool]:
-    """Return no tools until a logistics Swagger operation is approved."""
+    """Return no logistics tools until the domain is implemented."""
     return []

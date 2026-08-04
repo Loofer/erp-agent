@@ -34,6 +34,7 @@ default = true
 dev = [
     "pytest>=8,<9",
     "ruff>=0.8,<1",
+    "uvicorn[standard]>=0.30",
 ]
 
 [tool.pytest.ini_options]

@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from api_view.dependencies import get_chat_service
+
 from api_view.web_main import app
 
 

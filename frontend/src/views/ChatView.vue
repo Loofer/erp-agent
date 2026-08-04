@@ -1,28 +1,53 @@
 <script setup lang="ts">
-import { h, ref, nextTick, onMounted } from 'vue'
-import { Bubble, Conversations, Sender } from 'ant-design-x-vue'
+import { h, ref, computed, nextTick, onMounted } from 'vue'
+import { Conversations, Sender } from 'ant-design-x-vue'
 import type { ConversationsProps } from 'ant-design-x-vue'
-import { PlusOutlined, RobotOutlined, UserOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, RobotOutlined, StopOutlined, ToolOutlined } from '@ant-design/icons-vue'
 import { useChatStore } from '@/stores/chat'
+import MessageBubble from '@/components/MessageBubble.vue'
+import HitlApprovalBar from '@/components/HitlApprovalBar.vue'
 
 const store = useChatStore()
 const inputValue = ref('')
 const messagesEndRef = ref<HTMLDivElement | null>(null)
+const showExecution = ref(false)
 
 onMounted(() => {
   store.loadHistory()
 })
 
-// 自动滚动到最新消息
 async function scrollToBottom() {
   await nextTick()
   messagesEndRef.value?.scrollIntoView({ behavior: 'smooth' })
 }
 
+// 判断是否处于输入型 HITL（用户可输入以提供补充数据）
+const isInputHitl = computed(
+  () => store.pendingInterrupt?.interrupt_mode === 'input',
+)
+
+// 是否处于审批型 HITL（输入框被隐藏，改为两个按钮）
+const isApprovalHitl = computed(
+  () => store.pendingInterrupt?.interrupt_mode === 'approval',
+)
+
+// 输入型 HITL 时的 placeholder
+const senderPlaceholder = computed(() => {
+  if (isInputHitl.value) {
+    return store.pendingInterrupt?.hint || '请输入补充信息…'
+  }
+  return '输入消息，按 Enter 发送…'
+})
+
 async function handleSend(val: string) {
   if (!val.trim() || store.loading) return
   inputValue.value = ''
-  await store.sendMessage(val)
+
+  if (isInputHitl.value) {
+    await store.resumeInput(val.trim())
+  } else {
+    await store.sendMessage(val.trim())
+  }
   scrollToBottom()
 }
 
@@ -55,7 +80,7 @@ const conversationMenuConfig: ConversationsProps['menu'] = () => ({
 
     <!-- 右侧：聊天区域 -->
     <main class="chat-panel">
-      <!-- 上半部分：消息列表 -->
+      <!-- 消息列表 -->
       <div class="messages-area">
         <div v-if="store.messages.length === 0" class="welcome-hint">
           <RobotOutlined class="welcome-icon" />
@@ -69,28 +94,40 @@ const conversationMenuConfig: ConversationsProps['menu'] = () => ({
             class="bubble-row"
             :class="msg.role"
           >
-            <Bubble
-              :content="msg.content"
-              :placement="msg.role === 'user' ? 'end' : 'start'"
-              :loading="msg.loading"
-              :avatar="
-                msg.role === 'user'
-                  ? { icon: h(UserOutlined) }
-                  : { icon: h(RobotOutlined), style: { background: '#1677ff' } }
-              "
-            />
+            <MessageBubble :message="msg" :show-execution="showExecution" />
           </div>
         </template>
 
         <div ref="messagesEndRef" />
       </div>
 
-      <!-- 下半部分：输入框 -->
-      <div class="input-area">
+      <!-- 底部输入区：审批型 HITL → 两个按钮；其余 → Sender -->
+      <HitlApprovalBar v-if="isApprovalHitl" />
+      <div v-else class="input-area">
+        <div class="sender-toolbar">
+          <ToolOutlined />
+          <span>显示执行过程</span>
+          <a-switch v-model:checked="showExecution" size="small" />
+        </div>
+        <!-- 取消按钮（流进行中时显示） -->
+        <div v-if="store.loading" class="cancel-bar">
+          <a-button
+            type="text"
+            size="small"
+            :icon="h(StopOutlined)"
+            @click="store.cancelStream()"
+          >
+            停止生成
+          </a-button>
+        </div>
+        <!-- 输入型 HITL 时顶部提示条 -->
+        <div v-if="isInputHitl" class="input-hitl-hint">
+          💬 {{ store.pendingInterrupt?.hint || '请补充所需信息以继续操作' }}
+        </div>
         <Sender
           v-model:value="inputValue"
           :loading="store.loading"
-          placeholder="输入消息，按 Enter 发送…"
+          :placeholder="senderPlaceholder"
           @submit="handleSend"
         />
       </div>
@@ -99,7 +136,7 @@ const conversationMenuConfig: ConversationsProps['menu'] = () => ({
 </template>
 
 <style scoped>
-/* ── 整体布局：左侧边栏 + 右侧聊天面板 ── */
+/* ── 整体布局 ── */
 .chat-layout {
   display: flex;
   height: 100vh;
@@ -155,7 +192,6 @@ const conversationMenuConfig: ConversationsProps['menu'] = () => ({
   min-width: 0;
 }
 
-/* 上半：消息区域 */
 .messages-area {
   flex: 1;
   overflow-y: auto;
@@ -186,11 +222,35 @@ const conversationMenuConfig: ConversationsProps['menu'] = () => ({
   color: #1677ff;
 }
 
-/* 下半：输入区 */
+/* ── 底部输入区 ── */
 .input-area {
-  padding: 16px 32px 20px;
+  padding: 0 32px 20px;
   background: #fff;
   border-top: 1px solid #f0f0f0;
   flex-shrink: 0;
+}
+
+.sender-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  min-height: 34px;
+  color: #595959;
+  font-size: 12px;
+}
+
+.cancel-bar {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 2px;
+}
+
+.input-hitl-hint {
+  padding: 8px 0 4px;
+  font-size: 13px;
+  color: #0958d9;
+  border-bottom: 1px dashed #91caff;
+  margin-bottom: 8px;
 }
 </style>

@@ -1,16 +1,9 @@
 from collections.abc import Callable
-from pathlib import Path
 
 import httpx
 import pytest
 
 from agent.tools.http_base import ApiClient
-from agent.tools.openapi import Operation, load_operation_catalog
-
-
-@pytest.fixture
-def catalog() -> dict[str, Operation]:
-    return load_operation_catalog(Path("openapi/swagger.json"))
 
 
 @pytest.fixture

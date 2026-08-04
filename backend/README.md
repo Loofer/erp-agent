@@ -24,7 +24,7 @@ in most-recently-active order.
 server creates a UUID and emits it first as a `conversation` SSE event. Each
 subsequent `message_chunk` payload also includes `thread_id`.
 
-The only active read operation is `getDashboard`. Supplier creation is staged as
+The dashboard tool calls the ERP statistics endpoint directly. Supplier creation is staged as
 a pending action and must be approved before an HTTP request is sent.
 
 The Deep Agents runtime uses domain-organized in-process tools. The primary
@@ -33,7 +33,7 @@ Agent receives the read-only `get_dashboard` tool and the BI workflow.
 `procurement_order.yaml` exclusively receives `request_order_info`; each child
 declares its own native-HITL rule. `request_order_info` does not call an order
 API. Other business-domain modules are intentionally empty extension points
-until a reviewed Swagger operation is added.
+until the relevant domain API is implemented.
 
 Bundled memory and skills are exposed read-only through Deep Agents routes:
 `/memory/AGENTS.md`, `/skills/main/`, `/skills/procurement/`, and the order

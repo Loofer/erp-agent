@@ -5,7 +5,6 @@ from langgraph.store.memory import InMemoryStore
 
 from agent.main_agent import create_main_agent
 from agent.subagents.loader import SubagentDefinition
-from agent.tools.research_tools import web_search
 
 
 def test_main_agent_uses_native_hitl_and_loaded_subagents(
@@ -20,15 +19,7 @@ def test_main_agent_uses_native_hitl_and_loaded_subagents(
     monkeypatch.setattr(
         "agent.main_agent.deepagents.create_deep_agent", fake_create_deep_agent
     )
-    researcher = SubagentDefinition(
-        name="researcher",
-        description="Research supplier and market questions.",
-        system_prompt="Gather evidence before responding.",
-        model=None,
-        tools=("web_search",),
-    )
-
-    graph = create_main_agent("test:model", subagents=(researcher,))
+    graph = create_main_agent("test:model", subagents=())
 
     assert graph is not None
     assert captured["model"] == "test:model"
@@ -36,14 +27,7 @@ def test_main_agent_uses_native_hitl_and_loaded_subagents(
         "get_dashboard",
         "run_bi_text2sql",
     }
-    assert captured["subagents"] == [
-        {
-            "name": "researcher",
-            "description": "Research supplier and market questions.",
-            "system_prompt": "Gather evidence before responding.",
-            "tools": [web_search],
-        }
-    ]
+    assert captured["subagents"] == []
     assert "interrupt_on" not in captured
     assert captured["memory"] == ["/memory/AGENTS.md", "/memories/AGENTS.md"]
     assert captured["skills"] == ["/skills/main/", "/skills/procurement/"]
@@ -79,12 +63,6 @@ def test_main_agent_uses_supplied_persistence_dependencies(monkeypatch: Any) -> 
     assert captured["store"] is supplied_store
 
 
-def test_web_search_reports_missing_provider_configuration() -> None:
-    result = web_search.invoke({"query": "supplier inventory news"})
-
-    assert "not configured" in result.lower()
-
-
 def test_deployment_entrypoint_loads_yaml_before_creating_main_agent(
     monkeypatch: Any,
 ) -> None:
@@ -93,11 +71,11 @@ def test_deployment_entrypoint_loads_yaml_before_creating_main_agent(
     expected_graph = object()
     expected_definitions = (
         SubagentDefinition(
-            name="researcher",
-            description="Researches evidence.",
-            system_prompt="Research first.",
+            name="supplier_manager",
+            description="Manages suppliers.",
+            system_prompt="Create suppliers after approval.",
             model=None,
-            tools=("web_search",),
+            tools=("create_supplier",),
         ),
     )
     captured: dict[str, object] = {}

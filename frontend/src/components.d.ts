@@ -12,8 +12,15 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AButton: typeof import('ant-design-vue/es')['Button']
+    AgentNodeCards: typeof import('./components/AgentNodeCards.vue')['default']
+    ASwitch: typeof import('ant-design-vue/es')['Switch']
     HelloWorld: typeof import('./components/HelloWorld.vue')['default']
+    HitlApprovalBar: typeof import('./components/HitlApprovalBar.vue')['default']
+    InterruptCard: typeof import('./components/InterruptCard.vue')['default']
+    MessageBubble: typeof import('./components/MessageBubble.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    ToolCallItem: typeof import('./components/ToolCallItem.vue')['default']
+    ToolCallSteps: typeof import('./components/ToolCallSteps.vue')['default']
   }
 }

@@ -33,15 +33,15 @@ def _uuid7() -> str:
         bits 66-127 : rand_b  (62 random bits)
     """
     ms = int(time.time() * 1000)
-    rand = int.from_bytes(os.urandom(10), "big")   # 80 random bits
-    rand_a = (rand >> 68) & 0xFFF                  # top 12 bits
-    rand_b = rand & 0x3FFF_FFFF_FFFF_FFFF          # bottom 62 bits
+    rand = int.from_bytes(os.urandom(10), "big")  # 80 random bits
+    rand_a = (rand >> 68) & 0xFFF  # top 12 bits
+    rand_b = rand & 0x3FFF_FFFF_FFFF_FFFF  # bottom 62 bits
     value = (
-        ((ms & 0xFFFF_FFFF_FFFF) << 80)
-        | (0x7 << 76)
-        | (rand_a << 64)
-        | (0b10 << 62)
-        | rand_b
+            ((ms & 0xFFFF_FFFF_FFFF) << 80)
+            | (0x7 << 76)
+            | (rand_a << 64)
+            | (0b10 << 62)
+            | rand_b
     )
     return str(_uuid_mod.UUID(int=value))
 
@@ -69,8 +69,8 @@ class ResumeRequest(BaseModel):
 
 @router.post("/api/chat/stream", tags=["chat"])
 async def chat_stream(
-    payload: ChatStreamRequest,
-    service: ChatServiceDependency,
+        payload: ChatStreamRequest,
+        service: ChatServiceDependency,
 ) -> EventSourceResponse:
     thread_id = payload.thread_id or _uuid7()
     return EventSourceResponse(
@@ -86,9 +86,9 @@ async def chat_stream(
 
 @router.post("/api/chat/{thread_id}/resume", tags=["chat"])
 async def chat_resume(
-    thread_id: str,
-    payload: ResumeRequest,
-    service: ChatServiceDependency,
+        thread_id: str,
+        payload: ResumeRequest,
+        service: ChatServiceDependency,
 ) -> EventSourceResponse:
     return EventSourceResponse(
         _encode_sse_events(
@@ -104,8 +104,8 @@ async def chat_resume(
 
 @router.get("/api/history", tags=["history"])
 async def list_history(
-    service: ChatServiceDependency,
-    user_id: str = Query(min_length=1),
+        service: ChatServiceDependency,
+        user_id: str = Query(min_length=1),
 ) -> dict[str, list[ThreadInfo]]:
     """Return the user's conversation threads with full metadata."""
     return {"threads": await service.list_threads(user_id)}
@@ -113,9 +113,9 @@ async def list_history(
 
 @router.get("/api/chat/{thread_id}/messages", tags=["chat"])
 async def get_thread_messages(
-    thread_id: str,
-    service: ChatServiceDependency,
-    user_id: str = Query(min_length=1),
+        thread_id: str,
+        service: ChatServiceDependency,
+        user_id: str = Query(min_length=1),
 ) -> dict[str, list]:
     """Return the stored human/AI messages for an existing thread."""
     messages = await service.get_thread_messages(thread_id, user_id)
@@ -128,10 +128,25 @@ async def get_thread_messages(
 
 
 async def _encode_sse_events(
-    events: AsyncIterator[dict[str, object]],
+        events: AsyncIterator[dict[str, object]],
 ) -> AsyncIterator[ServerSentEvent]:
+    """Encode service events as SSE, folding namespace/meta into the JSON body.
+
+    SSE frames carry a single `data` field, so `namespace` and `meta` travel
+    inside the payload rather than as sibling frame fields. `namespace` tells
+    the client which (sub)agent produced the event: `[]` is the main agent.
+    """
     async for event in events:
+        payload = {
+            "namespace": event.get("namespace", []),
+            "meta": event.get("meta", {}),
+            **_as_dict(event.get("data")),
+        }
         yield ServerSentEvent(
             event=str(event["event"]),
-            data=json.dumps(event["data"], default=str),
+            data=json.dumps(payload, ensure_ascii=False, default=str),
         )
+
+
+def _as_dict(data: object) -> dict[str, Any]:
+    return data if isinstance(data, dict) else {"value": data}

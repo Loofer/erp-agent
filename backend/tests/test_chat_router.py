@@ -3,7 +3,6 @@ from typing import get_type_hints
 from fastapi.testclient import TestClient
 
 from api_view.chat_service import ChatService
-from api_view.dependencies import get_chat_service
 from api_view.web_main import app
 
 
@@ -14,7 +13,6 @@ def test_stream_endpoint_keeps_the_public_path(monkeypatch) -> None:
 
     monkeypatch.setitem(
         app.dependency_overrides,
-        get_chat_service,
         FakeChatService,
     )
 
@@ -54,7 +52,6 @@ def test_history_endpoint_keeps_the_public_path(monkeypatch) -> None:
 
     monkeypatch.setitem(
         app.dependency_overrides,
-        get_chat_service,
         FakeChatService,
     )
 

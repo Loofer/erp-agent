@@ -1,13 +1,15 @@
 ---
 name: order-management
-description: Collect missing procurement-order information through the reviewed human-input workflow.
+description: 负责采购订单管理；当前支持创建采购订单——补全草稿字段后触发人工审批中断，等待批准、编辑或拒绝，审批完成前不得声称订单已写入 ERP。
 ---
 
-# Order Management
+# 采购订单管理
 
-When an order draft has missing required fields, call `request_order_info` with
-the draft and the missing field names. The native Deep Agents approval flow
-pauses before execution so a reviewer can edit the draft or reject the request.
+当前支持创建采购订单。草稿必填字段不完整时，调用 `request_order_info`
+并传入草稿内容和缺失字段名称，向用户请求补充。
 
-Do not report that an order was created or updated. No order API operation is
-registered in this skeleton yet.
+字段完整后调用 `request_order_info` 提交草稿，触发 Deep Agents 人工审批中断；
+审批结果分三种：批准（approve）、编辑（edit）、拒绝（reject），
+处理方式参见子代理配置。
+
+审批完成前不得向用户声称订单已创建或已写入 ERP。

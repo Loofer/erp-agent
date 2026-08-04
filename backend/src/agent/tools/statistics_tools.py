@@ -1,27 +1,16 @@
-"""Statistics-domain tools backed by reviewed Swagger operations."""
+"""Statistics-domain tools backed by the ERP HTTP API."""
 
 from langchain_core.tools import BaseTool, tool
 
 from .http_base import ApiClient
-from .openapi import Operation
-
-ACTIVE_READ_OPERATION = "getDashboard"
 
 
-def build_statistics_tools(
-    catalog: dict[str, Operation], client: ApiClient
-) -> list[BaseTool]:
-    """Bind the approved procurement-dashboard read operation."""
-    dashboard_operation = catalog[ACTIVE_READ_OPERATION]
+def build_statistics_tools(client: ApiClient) -> list[BaseTool]:
+    """Bind the procurement-dashboard read endpoint."""
 
     @tool
     def get_dashboard() -> dict[str, object]:
         """Fetch the procurement dashboard."""
-        return client.execute(
-            dashboard_operation,
-            path_params={},
-            query={},
-            body=None,
-        )
+        return client.get("/api/statistics/dashboard")
 
     return [get_dashboard]

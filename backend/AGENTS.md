@@ -54,8 +54,7 @@ backend/
 │   │   │       └── supplier_manager.yaml
 │   │   ├── tools/
 │   │   │   ├── __init__.py       # build_parent_tools(), build_subagent_only_tools()
-│   │   │   ├── http_base.py      # ApiClient — enforces operation catalog; all HTTP calls go here
-│   │   │   ├── openapi.py        # Operation catalog loader (reads swagger.json)
+│   │   │   ├── http_base.py      # ApiClient — all ERP HTTP calls go here
 │   │   │   ├── hitl_tools.py     # Human-in-the-loop tool stubs
 │   │   │   ├── statistics_tools.py
 │   │   │   ├── suppliers_tools.py
@@ -65,7 +64,6 @@ backend/
 │   │   │   ├── orders_tools.py
 │   │   │   ├── parts_tools.py
 │   │   │   ├── bi_tools.py       # run_bi_text2sql workflow entry point
-│   │   │   └── research_tools.py # web_search (requires provider config)
 │   │   └── workflows/
 │   │       └── bi_text2sql.py    # BI Text-to-SQL workflow
 │   └── api_view/                 # FastAPI layer
@@ -82,8 +80,6 @@ backend/
 │   │   └── order-management/SKILL.md
 │   └── procurement/
 │       └── procurement-analysis/SKILL.md
-├── openapi/
-│   └── swagger.json              # ERP API specification (not committed; must be present at runtime)
 ├── tests/                        # pytest test suite
 ├── pyproject.toml
 ├── .env                          # Local secrets — never commit (see .env.example)
@@ -168,18 +164,16 @@ model: <optional override>  # omit to inherit parent model
 ### Tool Registration
 
 Tools are registered in `tools/__init__.py`:
-- `build_parent_tools(catalog, client)` → tools available to the **primary** agent
-- `build_subagent_only_tools(catalog, client)` → tools only subagents can receive by name in YAML
+- `build_parent_tools(client)` → tools available to the **primary** agent
+- `build_subagent_only_tools(client)` → tools only subagents can receive by name in YAML
 
-**All HTTP calls must go through `ApiClient`** in `http_base.py`. The client:
-- Enforces the operation catalog (operations must be pre-registered)
-- Blocks mutation operations via `execute()` — use `_send_supplier_create()` for the one approved mutation
-- Raises `ApiClientError` on transport/HTTP/API errors
+**All HTTP calls must go through `ApiClient`** in `http_base.py`. The client sends
+the method, path, query, and JSON body supplied by each tool and raises
+`ApiClientError` on transport/HTTP/API errors.
 
 To add a new tool:
-1. Register the `Operation` in `openapi.py` or read it from `swagger.json`
-2. Implement the tool function in the appropriate domain module (e.g., `orders_tools.py`)
-3. Add it to `build_parent_tools()` or `build_subagent_only_tools()` in `tools/__init__.py`
+1. Implement the tool function in the appropriate domain module (e.g., `orders_tools.py`)
+2. Add it to `build_parent_tools()` or `build_subagent_only_tools()` in `tools/__init__.py`
 4. Reference the tool name in the relevant subagent YAML if it's subagent-only
 
 ### Memory & Skills Backend
@@ -252,20 +246,13 @@ committed. They are exposed read-only to the agent via the `/skills/` backend ro
 - **Subagents**: add to `subagents/configs/` as a new YAML file. The loader auto-discovers all `*.yaml` files in that directory.
 - **Tool naming**: tool names in YAML must exactly match the `name` attribute on the `@tool`-decorated function.
 - **Line length**: 88 chars (ruff default). Target Python 3.12.
-- **ERP swagger**: `backend/openapi/swagger.json` must be present at runtime but is not committed. Obtain it from the ERP team or generate it from the running API.
-
 ---
 
 ## Uncertainties / Suggestions
 
-- `backend/openapi/swagger.json` is referenced at runtime but not committed.
-  Consider adding a `make swagger` or `uv run python scripts/fetch_swagger.py`
-  helper to download it, and document the URL in `.env.example`.
 - `MOTORPARTS_API_TOKEN` support in `ApiClient` — the token is loaded into settings
   but it is not clear whether `ApiClient` currently injects it as a Bearer header.
   Verify `http_base.py` passes auth headers when the token is set.
-- `web_search` in `research_tools.py` — availability depends on an undocumented
-  provider config. Document the required env var (e.g., `TAVILY_API_KEY` or similar).
 - `bi_text2sql.py` workflow — the BI endpoint URL and any required credentials are
   not yet documented. Add the relevant env vars to `.env.example` when configured.
 - User authentication is not implemented. `user_id` is passed from the frontend

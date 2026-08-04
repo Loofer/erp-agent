@@ -17,12 +17,10 @@ def write_definition(directory: Path, filename: str, content: str) -> None:
 def test_load_subagent_definitions_reads_valid_yaml(tmp_path: Path) -> None:
     write_definition(
         tmp_path,
-        "researcher.yaml",
-        """name: researcher
+        "sample.yaml",
+        """name: sample
 description: Investigates supplier and market questions.
 system_prompt: Gather evidence before responding.
-tools:
-  - web_search
 """,
     )
 
@@ -30,11 +28,11 @@ tools:
 
     assert definitions == (
         SubagentDefinition(
-            name="researcher",
+            name="sample",
             description="Investigates supplier and market questions.",
             system_prompt="Gather evidence before responding.",
             model=None,
-            tools=("web_search",),
+            tools=(),
         ),
     )
 
@@ -46,9 +44,8 @@ def test_shipped_subagent_definitions_cover_research_analysis_and_order() -> Non
 
     assert [(definition.name, definition.tools) for definition in definitions] == [
         ("procurement_analyst", ("get_dashboard", "run_bi_text2sql")),
-        ("procurement_order", ("web_search", "request_order_info")),
-        ("researcher", ("web_search",)),
-        ("supplier_manager", ("create_supplier",)),
+        ("procurement_order", ("request_order_info",)),
+        ("supplier_manager", ("create_supplier", "search_suppliers")),
     ]
     order_definition = next(
         definition for definition in definitions if definition.name == "procurement_order"
@@ -108,16 +105,16 @@ def test_subagent_interrupt_and_skills_remain_on_the_subagent() -> None:
     [
         ("- not-a-mapping", "malformed.yaml"),
         (
-            """name: researcher
+            """name: sample
 description: Investigates supplier and market questions.
 """,
             "system_prompt",
         ),
         (
-            """name: researcher
+            """name: sample
 description: Investigates supplier and market questions.
 system_prompt: Gather evidence before responding.
-tools: web_search
+tools: invalid_tool
 """,
             "tools",
         ),
@@ -133,12 +130,12 @@ def test_load_subagent_definitions_rejects_invalid_yaml(
 
 
 def test_load_subagent_definitions_rejects_duplicate_names(tmp_path: Path) -> None:
-    valid_definition = """name: researcher
+    valid_definition = """name: sample
 description: Investigates supplier and market questions.
 system_prompt: Gather evidence before responding.
 """
     write_definition(tmp_path, "first.yaml", valid_definition)
     write_definition(tmp_path, "second.yaml", valid_definition)
 
-    with pytest.raises(SubagentConfigurationError, match="researcher"):
+    with pytest.raises(SubagentConfigurationError, match="sample"):
         load_subagent_definitions(tmp_path)

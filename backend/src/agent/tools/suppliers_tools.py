@@ -1,44 +1,75 @@
-"""Supplier-domain tools for the motor-parts procurement agent.
-
-This module exposes reviewed supplier actions as ordinary LangChain tools while
-keeping the Swagger-aware HTTP client behind the tool boundary.
-"""
+"""Supplier-domain tools for the motor-parts procurement agent."""
 
 from typing import Any
 
 from langchain_core.tools import BaseTool, tool
 
-from .http_base import CATALOGED_SUPPLIER_CREATE, ApiClient
-from .openapi import Operation
-
-SUPPLIER_CREATE_OPERATION = "create"
+from .http_base import ApiClient
 
 
 def _create_supplier_request(
     client: ApiClient, payload: dict[str, Any]
 ) -> dict[str, object]:
     """Send the approved supplier creation request through the shared client."""
-    return client._send_supplier_create(dict(payload))
+    return client.post("/api/suppliers/create", dict(payload))
 
 
-def build_supplier_tools(
-    catalog: dict[str, Operation], client: ApiClient
-) -> list[BaseTool]:
-    """Build the reviewed supplier-domain tools for one configured API client."""
-    supplier_operation = catalog[SUPPLIER_CREATE_OPERATION]
-    if supplier_operation != CATALOGED_SUPPLIER_CREATE:
-        raise ValueError("Supplier creation must use the cataloged create operation.")
+def _search_suppliers_request(client: ApiClient, name: str) -> dict[str, object]:
+    """Search suppliers by name through the shared client."""
+    return client.get("/api/suppliers/search", query={"name": name})
+
+
+def build_supplier_tools(client: ApiClient) -> list[BaseTool]:
+    """Build supplier-domain tools for one configured API client."""
 
     @tool(parse_docstring=True)
-    def create_supplier(payload: dict[str, Any]) -> dict[str, object]:
+    def create_supplier(
+        supplierCode: str,
+        name: str,
+        contactPerson: str,
+        phone: str,
+        email: str,
+        address: str,
+        creditRating: str,
+        status: int = 0,
+    ) -> dict[str, object]:
         """Create a supplier after Deep Agents' required human approval.
 
         Args:
-            payload: Supplier data accepted by the reviewed supplier creation operation.
+            supplierCode: Unique identifier code for the supplier.
+            name: Full company name of the supplier.
+            contactPerson: Name of the primary contact person.
+            phone: Contact phone number.
+            email: Contact email address.
+            address: Physical address of the supplier.
+            creditRating: Credit rating of the supplier (e.g. A, B, C).
+            status: Supplier status flag; 0 = active.
 
         Returns:
             The API response for the approved supplier creation request.
         """
+        payload = {
+            "supplierCode": supplierCode,
+            "name": name,
+            "contactPerson": contactPerson,
+            "phone": phone,
+            "email": email,
+            "address": address,
+            "creditRating": creditRating,
+            "status": status,
+        }
         return _create_supplier_request(client, payload)
 
-    return [create_supplier]
+    @tool(parse_docstring=True)
+    def search_suppliers(name: str) -> dict[str, object]:
+        """Search suppliers whose names match the supplied text.
+
+        Args:
+            name: Full or partial supplier name to search for.
+
+        Returns:
+            The API response containing matching supplier records.
+        """
+        return _search_suppliers_request(client, name)
+
+    return [create_supplier, search_suppliers]

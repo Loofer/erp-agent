@@ -1,5 +1,5 @@
 """Graph streaming orchestration for the chat transport."""
-
+import logging
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -8,8 +8,18 @@ from langgraph.types import Command
 
 from .chat_persistence import ConversationRepository, ThreadInfo
 
+_log = logging.getLogger(__name__)
+
 # Truncate initial_prompt so checkpoint metadata stays compact.
 _INITIAL_PROMPT_MAX = 500
+
+# HumanInTheLoopMiddleware decision types.  "respond" means the human answers
+# *instead of* executing the tool, so it is the only decision that needs free
+# text from the user; everything else is a button press.
+_INPUT_DECISION = "respond"
+
+_APPROVAL_HINT = "即将执行以下操作，请确认是否继续。"
+_INPUT_HINT = "请补充所需信息以继续操作"
 
 
 class ChatService:
@@ -72,6 +82,10 @@ class ChatService:
         )
 
         interrupted = False
+        # An interrupt raised inside a subagent is re-emitted at every enclosing
+        # namespace as the graph unwinds, so the same Interrupt.id arrives more
+        # than once.  Emit each one only on its first (innermost) sighting.
+        seen_interrupts: set[str] = set()
         try:
             graph = self._get_graph()
             async for chunk in graph.astream(
@@ -82,39 +96,65 @@ class ChatService:
                 subgraphs=True,
                 version="v2",
             ):
+                # With version="v2" every chunk is a single dict shaped
+                # {"type", "ns", "data", ...} — subgraphs=True puts the
+                # namespace under "ns" rather than wrapping in a tuple.
                 chunk_type = chunk.get("type")
+                ns_list = list(chunk.get("ns") or ())
                 if chunk_type == "values":
-                    # LangGraph v2 streaming: payload is under "data", not "values".
+                    # v2 pops __interrupt__ out of the state into "interrupts".
                     graph_state = chunk.get("data", {})
-                    if "__interrupt__" in graph_state:
+                    interrupts = chunk.get("interrupts") or ()
+                    for item in interrupts:
+                        interrupt_id = getattr(item, "id", None)
+                        if interrupt_id is not None:
+                            if interrupt_id in seen_interrupts:
+                                continue
+                            seen_interrupts.add(interrupt_id)
                         interrupted = True
                         yield {
                             "event": "interrupt",
-                            "data": {
-                                "thread_id": thread_id,
-                                "resume_data": graph_state["__interrupt__"],
-                                "hint": "Waiting for a human decision or supplemental data.",
-                            },
+                            "namespace": ns_list,
+                            "data": _interrupt_data(item, thread_id, ns_list),
                         }
-                        break
-                    yield {"event": "graph_state", "data": graph_state}
+                    if interrupts:
+                        # Keep draining: LangGraph must finish unwinding for the
+                        # checkpoint to record the pending interrupt.  Breaking
+                        # early loses it and the resume replays the node instead.
+                        continue
+                    yield {
+                        "event": "graph_state",
+                        "namespace": ns_list,
+                        "data": _state_data(graph_state),
+                    }
                 elif chunk_type == "messages":
-                    # LangGraph v2 streaming: payload is under "data", not "messages".
-                    # Each item is a (message_chunk, metadata) tuple.
-                    for item in chunk.get("data", []):
-                        graph_message = item[0] if isinstance(item, (list, tuple)) else item
-                        yield {
-                            "event": "message_chunk",
-                            "data": _message_data(graph_message, thread_id),
-                        }
-                elif chunk_type in {"node_start", "node_end"}:
-                    yield {"event": chunk_type, "data": chunk}
-        except Exception as exc:  # noqa: BLE001 - translate graph failures to SSE.
-            yield {"event": "error", "data": {"error": repr(exc)}}
+                    # v2 "messages" payload is one (message_chunk, metadata)
+                    # tuple — not a list of them.  Iterating it yields the
+                    # message and the metadata as two separate events.
+                    payload = chunk.get("data")
+                    if isinstance(payload, (list, tuple)) and len(payload) == 2:
+                        graph_message, msg_meta = payload
+                    else:
+                        graph_message, msg_meta = payload, {}
+                    yield {
+                        "event": "message_chunk",
+                        "namespace": ns_list,
+                        "meta": _message_meta(msg_meta),
+                        "data": _message_data(graph_message, thread_id),
+                    }
+        except Exception:
+            # 生产禁止直接repr(exc)对外暴露堆栈！
+            _log.exception("Agent run failed for thread %s", thread_id)
+            yield {
+                "event": "error",
+                "namespace": [],
+                "meta": {},
+                "data": {"thread_id": thread_id, "message": "Agent run exception"},
+            }
             return
 
         if not interrupted:
-            yield {"event": "complete", "data": {"thread_id": thread_id}}
+            yield {"event": "complete", "namespace": [], "data": {"thread_id": thread_id}}
 
     async def list_threads(self, user_id: str) -> list[ThreadInfo]:
         """List the active agent's conversation threads for one user."""
@@ -152,6 +192,88 @@ def _message_data(message: object, thread_id: str) -> object:
     if isinstance(data, dict):
         return {**data, "thread_id": thread_id}
     return {"thread_id": thread_id, "message": data}
+
+
+# Only the metadata the UI needs.  The raw dict also carries lc_versions,
+# langgraph_path, ls_* tracing keys and similar noise.
+_META_KEYS = ("langgraph_node", "langgraph_step", "lc_agent_name", "checkpoint_ns")
+
+
+def _message_meta(meta: object) -> dict[str, object]:
+    """Project LangGraph message metadata down to the UI-relevant keys."""
+    if not isinstance(meta, dict):
+        return {}
+    return {key: meta[key] for key in _META_KEYS if meta.get(key) is not None}
+
+
+def _state_data(state: object) -> dict[str, object]:
+    """Summarise a values chunk — the full message list is streamed separately."""
+    if not isinstance(state, dict):
+        return {}
+    messages = state.get("messages")
+    return {
+        "message_count": len(messages) if isinstance(messages, list) else 0,
+        "todos": state.get("todos") or [],
+    }
+
+
+def _interrupt_data(
+    item: object, thread_id: str, namespace: list[str]
+) -> dict[str, object]:
+    """Translate one LangGraph Interrupt into the frontend interrupt contract.
+
+    HumanInTheLoopMiddleware interrupts carry a HITLRequest:
+        {"action_requests": [{"name", "args", "description"}],
+         "review_configs": [{"action_name", "allowed_decisions"}]}
+    and expect ``Command(resume={"decisions": [...]})`` to continue.  The
+    allowed decisions come straight from each tool's review config, so the UI
+    can render exactly the buttons the graph will accept.
+    """
+    raw_value = getattr(item, "value", item)
+    interrupt_id = getattr(item, "id", None)
+
+    actions: list[dict[str, object]] = []
+    decisions: list[str] = []
+    if isinstance(raw_value, dict):
+        decisions_by_action: dict[str, list[str]] = {}
+        for config in raw_value.get("review_configs") or []:
+            if isinstance(config, dict):
+                allowed = config.get("allowed_decisions")
+                if isinstance(allowed, list):
+                    decisions_by_action[str(config.get("action_name"))] = [
+                        str(decision) for decision in allowed
+                    ]
+        for request in raw_value.get("action_requests") or []:
+            if not isinstance(request, dict):
+                continue
+            name = str(request.get("name", ""))
+            allowed = decisions_by_action.get(name, [])
+            actions.append(
+                {
+                    "name": name,
+                    "args": request.get("args") or {},
+                    "description": request.get("description") or "",
+                    "allowed_decisions": allowed,
+                }
+            )
+            decisions.extend(d for d in allowed if d not in decisions)
+
+    # "respond" is the only decision that needs the user to type something.
+    interrupt_mode = "input" if decisions == [_INPUT_DECISION] else "approval"
+    hint = _INPUT_HINT if interrupt_mode == "input" else _APPROVAL_HINT
+
+    return {
+        "thread_id": thread_id,
+        "interrupt_id": interrupt_id,
+        "namespace": namespace,
+        "interrupt_mode": interrupt_mode,
+        "allowed_decisions": decisions,
+        "actions": actions,
+        "hint": hint,
+        # Raw value kept for debugging / non-HITL interrupts the UI can render
+        # generically.  Not used to build the resume payload.
+        "value": raw_value if isinstance(raw_value, (dict, list, str)) else str(raw_value),
+    }
 
 
 def _serialize_message(message: object) -> "dict[str, object] | None":

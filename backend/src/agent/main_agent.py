@@ -1,9 +1,9 @@
 """Deep Agents runtime construction for the motor-parts agent."""
 
 from pathlib import Path
-import logging
 
 import deepagents
+from langchain.agents.middleware import ToolCallLimitMiddleware
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
@@ -27,8 +27,6 @@ from .subagents.loader import (
 from .tools import build_parent_tools, build_subagent_only_tools
 from .tools.bi_tools import run_bi_text2sql
 from .tools.http_base import ApiClient
-from .tools.openapi import load_operation_catalog
-from .tools.research_tools import web_search
 
 
 def create_main_agent(
@@ -40,13 +38,11 @@ def create_main_agent(
 ) -> CompiledStateGraph:
     """Build the primary Deep Agents runtime from declarative configuration."""
     settings = load_settings()
-    contract_path = Path(__file__).resolve().parents[2] / "openapi" / "swagger.json"
-    catalog = load_operation_catalog(contract_path)
     client = ApiClient(settings.api_base_url)
 
-    parent_tools = [*build_parent_tools(catalog, client), run_bi_text2sql]
+    parent_tools = [*build_parent_tools(client), run_bi_text2sql]
 
-    subagent_tools = [*build_subagent_only_tools(catalog, client), web_search]
+    subagent_tools = build_subagent_only_tools(client)
 
     tools_by_name = {
         tool.name: tool for tool in [*parent_tools, *subagent_tools]
@@ -55,6 +51,7 @@ def create_main_agent(
     deep_agent_subagents = to_deep_agent_subagents(subagents, tools_by_name)
     return deepagents.create_deep_agent(
         model=model,
+        name="erp-agent",
         tools=parent_tools,
         system_prompt=build_system_prompt(),
         subagents=deep_agent_subagents,
@@ -65,6 +62,12 @@ def create_main_agent(
         permissions=build_runtime_permissions(),
         checkpointer=checkpointer,
         store=store,
+        middleware=[
+            ToolCallLimitMiddleware(
+                thread_limit=15,
+                run_limit=8,
+            )
+        ],
         context_schema=MemoryContext,
     )
 
