@@ -7,10 +7,11 @@ import uuid as _uuid_mod
 from collections.abc import AsyncIterator
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
+from .auth import request_user
 from .chat_persistence import ThreadInfo
 from .dependencies import ChatServiceDependency
 
@@ -54,11 +55,9 @@ def _uuid7() -> str:
 class ChatStreamRequest(BaseModel):
     message: str
     thread_id: str | None = None
-    user_id: str
 
 
 class ResumeRequest(BaseModel):
-    user_id: str
     resume: dict[str, Any]
 
 
@@ -70,15 +69,18 @@ class ResumeRequest(BaseModel):
 @router.post("/api/chat/stream", tags=["chat"])
 async def chat_stream(
         payload: ChatStreamRequest,
+        request: Request,
         service: ChatServiceDependency,
 ) -> EventSourceResponse:
+    user = request_user(request)
     thread_id = payload.thread_id or _uuid7()
     return EventSourceResponse(
         _encode_sse_events(
             service.stream(
                 message=payload.message,
                 thread_id=thread_id,
-                user_id=payload.user_id,
+                user_id=user.user_id,
+                user_name=user.user_name,
             )
         )
     )
@@ -88,14 +90,17 @@ async def chat_stream(
 async def chat_resume(
         thread_id: str,
         payload: ResumeRequest,
+        request: Request,
         service: ChatServiceDependency,
 ) -> EventSourceResponse:
+    user = request_user(request)
     return EventSourceResponse(
         _encode_sse_events(
             service.stream(
                 message=None,
                 thread_id=thread_id,
-                user_id=payload.user_id,
+                user_id=user.user_id,
+                user_name=user.user_name,
                 resume_data=payload.resume,
             )
         )
@@ -104,21 +109,21 @@ async def chat_resume(
 
 @router.get("/api/history", tags=["history"])
 async def list_history(
+        request: Request,
         service: ChatServiceDependency,
-        user_id: str = Query(min_length=1),
 ) -> dict[str, list[ThreadInfo]]:
     """Return the user's conversation threads with full metadata."""
-    return {"threads": await service.list_threads(user_id)}
+    return {"threads": await service.list_threads(request_user(request).user_id)}
 
 
 @router.get("/api/chat/{thread_id}/messages", tags=["chat"])
 async def get_thread_messages(
         thread_id: str,
+        request: Request,
         service: ChatServiceDependency,
-        user_id: str = Query(min_length=1),
 ) -> dict[str, list]:
     """Return the stored human/AI messages for an existing thread."""
-    messages = await service.get_thread_messages(thread_id, user_id)
+    messages = await service.get_thread_messages(thread_id, request_user(request).user_id)
     return {"messages": messages}
 
 

@@ -16,8 +16,10 @@ the `/memories/` route; the bundled `/memory/AGENTS.md` and `/skills/` remain
 read-only application guidance.
 
 `MOTORPARTS_AGENT_ID` defaults to `motorparts-agent`. It is recorded with
-`user_id` in the `t_deepagents_conversation` session table and scopes persistent memory.
-`GET /api/history?user_id=<id>` returns that user's conversation `thread_ids`
+the JWT `sub` claim in the `t_deepagents_conversation` session table and scopes
+persistent memory. The temporary API middleware also maps JWT `username` into
+the agent's request context. `GET /api/history` returns the authenticated
+user's conversation `thread_ids`
 in most-recently-active order.
 
 `POST /api/chat/stream` accepts an optional `thread_id`. When it is absent, the

@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-
+from api_view.dependencies import get_chat_service
 from api_view.web_main import app
 
 
@@ -24,7 +24,10 @@ def test_resume_endpoint_streams_service_events(monkeypatch) -> None:
 
     response = TestClient(app).post(
         "/api/chat/thread-1/resume",
-        json={"user_id": "user-1", "resume": {"supplement": "ABC"}},
+        headers={
+            "Authorization": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTEiLCJ1c2VybmFtZSI6IlRlc3QgVXNlciJ9."
+        },
+        json={"resume": {"supplement": "ABC"}},
     )
 
     assert response.status_code == 200

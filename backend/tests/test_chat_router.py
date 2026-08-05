@@ -3,6 +3,7 @@ from typing import get_type_hints
 from fastapi.testclient import TestClient
 
 from api_view.chat_service import ChatService
+from api_view.dependencies import get_chat_service
 from api_view.web_main import app
 
 
@@ -13,12 +14,16 @@ def test_stream_endpoint_keeps_the_public_path(monkeypatch) -> None:
 
     monkeypatch.setitem(
         app.dependency_overrides,
-        FakeChatService,
+        get_chat_service,
+        lambda: FakeChatService(),
     )
 
     response = TestClient(app).post(
         "/api/chat/stream",
-        json={"message": "status", "thread_id": "thread-1", "user_id": "user-1"},
+        headers={
+            "Authorization": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTEiLCJ1c2VybmFtZSI6IlRlc3QgVXNlciJ9."
+        },
+        json={"message": "status", "thread_id": "thread-1"},
     )
 
     assert response.status_code == 200
@@ -52,10 +57,16 @@ def test_history_endpoint_keeps_the_public_path(monkeypatch) -> None:
 
     monkeypatch.setitem(
         app.dependency_overrides,
-        FakeChatService,
+        get_chat_service,
+        lambda: FakeChatService(),
     )
 
-    response = TestClient(app).get("/api/history", params={"user_id": "user-1"})
+    response = TestClient(app).get(
+        "/api/history",
+        headers={
+            "Authorization": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTEiLCJ1c2VybmFtZSI6IlRlc3QgVXNlciJ9."
+        },
+    )
 
     assert response.status_code == 200
     body = response.json()

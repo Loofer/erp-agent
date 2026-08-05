@@ -9,7 +9,6 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.base import BaseStore
-from langgraph.store.memory import InMemoryStore
 
 from .config import load_settings
 from .memory.prompts import build_system_prompt
@@ -21,14 +20,17 @@ from .memory.runtime import (
     build_agent_backend,
     build_runtime_permissions,
 )
+from .middlewares import build_runtime_middlewares
+from .rag.hybrid_retriever import HybridRetriever
+from .rag.runtime import build_hybrid_retriever
 from .subagents.loader import (
     SubagentDefinition,
     load_subagent_definitions,
     to_deep_agent_subagents,
 )
-from .tools import build_parent_tools, build_subagent_only_tools
-from .tools.bi_tools import run_bi_text2sql
+from .tools import build_subagent_only_tools
 from .tools.http_base import ApiClient
+from .tools.knowledge_tools import build_knowledge_tools
 
 
 def create_main_agent(
@@ -37,12 +39,13 @@ def create_main_agent(
         subagents: tuple[SubagentDefinition, ...],
         checkpointer: BaseCheckpointSaver | None = None,
         store: BaseStore | None = None,
+        rag_retriever: HybridRetriever | None = None,
 ) -> CompiledStateGraph:
     """Build the primary Deep Agents runtime from declarative configuration."""
     settings = load_settings()
     client = ApiClient(settings.api_base_url)
 
-    parent_tools = [*build_parent_tools(client), run_bi_text2sql]
+    parent_tools = build_knowledge_tools(rag_retriever)
 
     subagent_tools = build_subagent_only_tools(client)
 
@@ -68,7 +71,8 @@ def create_main_agent(
             ToolCallLimitMiddleware(
                 thread_limit=15,
                 run_limit=8,
-            )
+            ),
+            *build_runtime_middlewares(),
         ],
         context_schema=MemoryContext,
     )
@@ -77,9 +81,15 @@ def create_main_agent(
 def load_agent_graph(
         checkpointer: BaseCheckpointSaver | None = None,
         store: BaseStore | None = None,
+        rag_retriever: HybridRetriever | None = None,
 ) -> CompiledStateGraph:
     """Load YAML subagents and build the deployment graph."""
     settings = load_settings()
+    if rag_retriever is None:
+        try:
+            rag_retriever = build_hybrid_retriever(settings)
+        except Exception:  # noqa: BLE001
+            rag_retriever = None
     model = ChatOpenAI(
         model=settings.model,
         api_key=settings.api_key,
@@ -94,6 +104,7 @@ def load_agent_graph(
         subagents=subagents,
         checkpointer=checkpointer,
         store=store,
+        rag_retriever=rag_retriever,
     )
 
 

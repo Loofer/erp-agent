@@ -47,7 +47,9 @@ from langgraph.store.postgres import PostgresStore
 
 from agent.config import load_settings
 from agent.main_agent import load_agent_graph
+from agent.rag.runtime import build_hybrid_retriever
 
+from .auth import JwtIdentityMiddleware
 from .chat import router as chat_router
 from .chat_persistence import ConversationRepository
 from .chat_service import ChatService
@@ -74,9 +76,18 @@ async def lifespan(app: FastAPI):
             conversations = ConversationRepository(checkpointer.conn)
             await conversations.setup()
 
+            rag_retriever = None
+            try:
+                rag_retriever = await asyncio.to_thread(build_hybrid_retriever, settings)
+            except Exception:  # noqa: BLE001
+                _log.exception("RAG initialisation failed; continuing without retrieval")
+
             _log.info("Initialising agent graph......")
             graph = await asyncio.to_thread(
-                load_agent_graph, checkpointer=checkpointer, store=store
+                load_agent_graph,
+                checkpointer=checkpointer,
+                store=store,
+                rag_retriever=rag_retriever,
             )
             _log.info("Agent graph ready.")
 
@@ -84,11 +95,13 @@ async def lifespan(app: FastAPI):
                 graph,
                 conversations,
                 agent_id=settings.agent_id,
+                rag_retriever=rag_retriever,
             )
             yield
 
 
 app = FastAPI(title="Motorparts Agent", lifespan=lifespan)
+app.add_middleware(JwtIdentityMiddleware)
 app.include_router(chat_router)
 
 

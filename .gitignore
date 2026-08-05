@@ -6,3 +6,6 @@
 
 # AI tools
 .codex/
+
+# RAG ingestion runtime state
+backend/doc/.rag-state.json

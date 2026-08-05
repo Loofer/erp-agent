@@ -138,9 +138,11 @@ then fills `content` incrementally as SSE `message_chunk` events arrive.
 
 All backend communication lives here. Key exports:
 
-### `CURRENT_USER_ID`
-Hardcoded to `'demo-user'`. **Replace this with a real authenticated user ID**
-once a login flow exists. It is passed as `user_id` in every request.
+### JWT Authorization
+The API client sends `Authorization: Bearer <token>` on every chat request. In
+development, `VITE_DEV_JWT` can override the bundled temporary token, whose
+claims are `sub` and `username`. Replace it with a real login-issued signed JWT
+before production; do not put `user_id` in API bodies or query strings.
 
 ### `streamChat(message, threadId, callbacks)`
 
@@ -222,9 +224,9 @@ backend, or configure a reverse proxy so `/api` routes hit the backend.
 
 ## Uncertainties / Suggestions
 
-- **Authentication**: `CURRENT_USER_ID` is hardcoded to `'demo-user'` in
-  `src/api/chat.ts`. Before going to production, replace this with a real
-  auth token flow (e.g., store the user ID in a Pinia `useAuthStore` after login).
+- **Authentication**: the bundled JWT is a development fixture only. Before
+  production, replace it with a login flow that stores and refreshes a signed
+  access token.
 
 - **HITL interrupt UI**: The `interrupt` SSE event is currently ignored.
   When the backend pauses for human approval (e.g., `create_supplier`),

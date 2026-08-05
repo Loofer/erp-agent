@@ -1,6 +1,8 @@
-"""Extension point for future Deep Agents middleware configuration."""
+"""Deep Agents middleware configuration."""
+
+from .rag_context import RequestContextPromptMiddleware
 
 
 def build_runtime_middlewares() -> list[object]:
-    """Return no custom middleware while native HITL is sufficient."""
-    return []
+    """Return request-context middleware after Deep Agents built-ins."""
+    return [RequestContextPromptMiddleware()]

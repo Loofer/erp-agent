@@ -8,8 +8,18 @@ import type {
   ResumePayload,
 } from '@/types/agent'
 
-/** 硬编码用户 ID，后续接入登录后替换 */
-export const CURRENT_USER_ID = 'demo-user'
+/**
+ * Temporary development JWT. A real login flow must set VITE_DEV_JWT with a
+ * signed token; the backend currently reads `sub` and `username` claims.
+ */
+const DEVELOPMENT_JWT =
+  'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJkZW1vLXVzZXIiLCJ1c2VybmFtZSI6IkRlbW8gVXNlciJ9.'
+
+function authHeaders(): HeadersInit {
+  return {
+    Authorization: `Bearer ${import.meta.env.VITE_DEV_JWT || DEVELOPMENT_JWT}`,
+  }
+}
 
 export interface ChatMessage {
   id: string
@@ -38,12 +48,12 @@ export interface ConversationItem {
 }
 
 /**
- * GET /api/history?user_id=<id>
+ * GET /api/history
  * 后端返回 { threads: ThreadInfo[] }
  */
 export async function fetchHistory(): Promise<ConversationItem[]> {
   try {
-    const res = await fetch(`/api/history?user_id=${CURRENT_USER_ID}`)
+    const res = await fetch('/api/history', { headers: authHeaders() })
     if (!res.ok) return []
     const data: { threads: ThreadInfo[] } = await res.json()
     const threads = data.threads ?? []
@@ -60,14 +70,14 @@ export async function fetchHistory(): Promise<ConversationItem[]> {
 }
 
 /**
- * GET /api/chat/{thread_id}/messages?user_id=<id>
+ * GET /api/chat/{thread_id}/messages
  * 返回指定会话的历史消息列表
  */
 export async function fetchThreadMessages(threadId: string): Promise<ChatMessage[]> {
   try {
-    const res = await fetch(
-      `/api/chat/${encodeURIComponent(threadId)}/messages?user_id=${CURRENT_USER_ID}`,
-    )
+    const res = await fetch(`/api/chat/${encodeURIComponent(threadId)}/messages`, {
+      headers: authHeaders(),
+    })
     if (!res.ok) return []
     const data: { messages: Array<{ id: string; role: string; content: string }> } =
       await res.json()
@@ -96,8 +106,8 @@ export async function resumeChat(
   try {
     const res = await fetch(`/api/chat/${encodeURIComponent(threadId)}/resume`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: CURRENT_USER_ID, resume: resumeData }),
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ resume: resumeData }),
       signal: callbacks.signal,
     })
     if (!res.ok || !res.body) {
@@ -150,10 +160,9 @@ export async function streamChat(
   try {
     const res = await fetch('/api/chat/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
         message,
-        user_id: CURRENT_USER_ID,
         ...(threadId ? { thread_id: threadId } : {}),
       }),
       signal: callbacks.signal,

@@ -9,10 +9,12 @@ class FakeGraph:
     def __init__(self) -> None:
         self.input: object | None = None
         self.config: dict[str, Any] | None = None
+        self.context: dict[str, Any] | None = None
 
     async def astream(self, **kwargs: Any) -> AsyncIterator[dict[str, object]]:
         self.input = kwargs["input"]
         self.config = kwargs["config"]
+        self.context = kwargs["context"]
         yield {
             "type": "messages",
             "ns": [],
@@ -50,6 +52,14 @@ async def test_resume_stream_uses_command_and_thread_configuration() -> None:
     # metadata is persisted into every checkpoint for history queries
     assert graph.config["metadata"]["user_id"] == "user-1"
     assert graph.config["metadata"]["agent_id"] == "motorparts-agent"
+    assert graph.context is not None
+    assert graph.context == {
+        "user_id": "user-1",
+        "username": "user-1",
+        "agent_id": "motorparts-agent",
+        "current_time": graph.context["current_time"],
+        "retrieval_context": "",
+    }
     assert events[-1] == {
         "event": "complete",
         "namespace": [],
@@ -61,6 +71,7 @@ class ParentAndSubagentGraph(FakeGraph):
     async def astream(self, **kwargs: Any) -> AsyncIterator[dict[str, object]]:
         self.input = kwargs["input"]
         self.config = kwargs["config"]
+        self.context = kwargs["context"]
         yield {
             "type": "messages",
             "ns": ["tools:subagent-run"],

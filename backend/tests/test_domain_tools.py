@@ -2,7 +2,7 @@ import json
 
 import httpx
 
-from agent.tools import build_parent_tools, build_subagent_only_tools
+from agent.tools import build_subagent_only_tools
 from agent.tools.customers_tools import build_customer_tools
 from agent.tools.hitl_tools import request_supplier_info
 from agent.tools.http_base import ApiClient
@@ -11,14 +11,6 @@ from agent.tools.logistics_tools import build_logistics_tools
 from agent.tools.orders_tools import build_order_tools
 from agent.tools.parts_tools import build_part_tools
 from agent.tools.suppliers_tools import build_supplier_tools
-
-
-def test_parent_tools_are_limited_to_read_only_domain_operations(
-    client: object
-) -> None:
-    tools = build_parent_tools(client)
-
-    assert [tool.name for tool in tools] == ["get_dashboard"]
 
 
 def test_subagent_only_tools_are_not_registered_on_the_parent(

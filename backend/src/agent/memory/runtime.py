@@ -1,7 +1,7 @@
 """Deep Agents backend routes for bundled and durable user memory."""
 
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import TypedDict
 
 from deepagents import FilesystemPermission
@@ -25,6 +25,8 @@ class MemoryContext(TypedDict):
     user_id: str
     username: str
     agent_id: str
+    current_time: str
+    retrieval_context: str
 
 
 def assistant_memory_namespace(

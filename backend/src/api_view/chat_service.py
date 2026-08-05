@@ -1,10 +1,13 @@
 """Graph streaming orchestration for the chat transport."""
+import asyncio
 import logging
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from typing import Any
 
 from langgraph.types import Command
+
+from agent.rag.hybrid_retriever import HybridRetriever, render_retrieval_context
 
 from .chat_persistence import ConversationRepository, ThreadInfo
 
@@ -32,11 +35,13 @@ class ChatService:
         *,
         graph_factory: Callable[[], Any] | None = None,
         agent_id: str = "motorparts-agent",
+        rag_retriever: HybridRetriever | None = None,
     ) -> None:
         self._graph = graph
         self._graph_factory = graph_factory
         self._conversations = conversations
         self._agent_id = agent_id
+        self._rag_retriever = rag_retriever
 
     async def stream(
         self,
@@ -44,6 +49,7 @@ class ChatService:
         thread_id: str,
         user_id: str,
         resume_data: dict[str, object] | None = None,
+        user_name: str | None = None,
     ) -> AsyncIterator[dict[str, object]]:
         if resume_data is None and message is None:
             raise ValueError("message is required when resume_data is not provided")
@@ -69,9 +75,18 @@ class ChatService:
         }
         context = {
             "user_id": user_id,
-            "username": user_id,
+            "username": user_name or user_id,
             "agent_id": self._agent_id,
+            "current_time": metadata["updated_at"],
+            "retrieval_context": "",
         }
+
+        if message is not None and self._rag_retriever is not None:
+            try:
+                retrieval = await asyncio.to_thread(self._rag_retriever.retrieve, message)
+                context["retrieval_context"] = render_retrieval_context(retrieval.context)
+            except Exception:  # noqa: BLE001
+                _log.exception("RAG retrieval failed for thread %s", thread_id)
 
         yield {"event": "conversation", "data": {"thread_id": thread_id}}
 
@@ -142,7 +157,7 @@ class ChatService:
                         "meta": _message_meta(msg_meta),
                         "data": _message_data(graph_message, thread_id),
                     }
-        except Exception:
+        except Exception:  # noqa: BLE001
             # 生产禁止直接repr(exc)对外暴露堆栈！
             _log.exception("Agent run failed for thread %s", thread_id)
             yield {
