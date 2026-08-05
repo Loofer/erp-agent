@@ -78,6 +78,14 @@ class PdfParser:
 
     def parse(self, path: Path) -> ParsedDocument:
         try:
+            # TODO Replace    pymupdf4llm
+            # PDF
+            # 提取引擎（按优先级自动选择，也可手动指定）：
+            # pymupdf4llm  — 最佳质量，保留表格 / 公式结构（推荐）
+            # markitdown   — 微软出品，通用性强
+            # pdfminer     — 纯文本提取，无额外依赖风险
+            # pypdf        — 轻量级备选
+            # OCR方案 Docling、MinerU、Marker‑pdf、Unstructured
             from pypdf import PdfReader
         except ImportError as exc:
             raise RuntimeError("PDF ingestion requires the optional pypdf package.") from exc
