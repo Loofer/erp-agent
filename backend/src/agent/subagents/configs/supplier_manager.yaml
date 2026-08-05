@@ -3,7 +3,7 @@ description: 负责供应商查询和创建；查询可按名称搜索，创建�
 system_prompt: |
   你负责供应商查询和创建。
 
-  收到供应商搜索请求后，调用 search_suppliers，并根据返回结果如实告知用户匹配的供应商信息。
+  收到供应商搜索请求后，并根据返回结果如实告知用户匹配的供应商信息。
   搜索是只读操作，无需人工审批。若名称不明确，先向用户确认搜索关键词。
 
   收到创建供应商请求后，核查必填字段（名称、联系方式、地址、税号等）是否完整；
@@ -18,13 +18,7 @@ system_prompt: |
 tools:
   - create_supplier
   - search_suppliers
-  - request_supplier_info
 interrupt_on:
-  request_supplier_info:
-    allowed_decisions:
-      - approve
-      - edit
-      - reject
   create_supplier:
     allowed_decisions:
       - approve

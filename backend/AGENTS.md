@@ -158,8 +158,8 @@ model: <optional override>  # omit to inherit parent model
 | Name | Role | HITL |
 |---|---|---|
 | `procurement_analyst` | Routes BI/dashboard queries | — |
-| `procurement_order` | Collects and drafts procurement orders | `request_order_info` (approve/edit/reject) |
-| `supplier_manager` | Stages supplier creation for approval | `create_supplier` (approve/reject) |
+| `procurement_order` | Collects and drafts procurement orders | `request_order_info` (respond); `create_order` / `update_order` (approve/reject) |
+| `supplier_manager` | Stages supplier creation for approval | `request_supplier_info` (respond); `create_supplier` (approve/reject) |
 
 ### Tool Registration
 

@@ -105,3 +105,12 @@ def test_deployment_entrypoint_loads_yaml_before_creating_main_agent(
     assert captured["subagents"] == expected_definitions
     assert captured["checkpointer"] is None
     assert captured["store"] is None
+
+
+def test_langgraph_dev_entrypoint_uses_default_persistence(monkeypatch: Any) -> None:
+    import agent.main_agent as main_agent_module
+
+    expected_graph = object()
+    monkeypatch.setattr(main_agent_module, "load_agent_graph", lambda: expected_graph)
+
+    assert main_agent_module.load_langgraph_dev_agent_graph() is expected_graph

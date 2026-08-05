@@ -1,5 +1,6 @@
 """FastAPI application composition and chat-runtime lifecycle."""
 
+import asyncio
 import logging
 import logging.config
 from contextlib import asynccontextmanager
@@ -74,7 +75,9 @@ async def lifespan(app: FastAPI):
             await conversations.setup()
 
             _log.info("Initialising agent graph......")
-            graph = load_agent_graph(checkpointer=checkpointer, store=store)
+            graph = await asyncio.to_thread(
+                load_agent_graph, checkpointer=checkpointer, store=store
+            )
             _log.info("Agent graph ready.")
 
             app.state.chat_service = ChatService(

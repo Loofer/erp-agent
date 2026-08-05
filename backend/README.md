@@ -29,11 +29,12 @@ a pending action and must be approved before an HTTP request is sent.
 
 The Deep Agents runtime uses domain-organized in-process tools. The primary
 Agent receives the read-only `get_dashboard` tool and the BI workflow.
-`supplier_manager.yaml` exclusively receives `create_supplier`, while
-`procurement_order.yaml` exclusively receives `request_order_info`; each child
-declares its own native-HITL rule. `request_order_info` does not call an order
-API. Other business-domain modules are intentionally empty extension points
-until the relevant domain API is implemented.
+`supplier_manager.yaml` receives supplier search, input collection, and creation
+tools, while `procurement_order.yaml` receives order input collection and order
+mutation tools. The `request_*_info` tools are `respond`-only ask-user
+placeholders and do not call the ERP API; creation/update tools require
+`approve` or `reject`. Other business-domain modules are intentionally empty
+extension points until the relevant domain API is implemented.
 
 Bundled memory and skills are exposed read-only through Deep Agents routes:
 `/memory/AGENTS.md`, `/skills/main/`, `/skills/procurement/`, and the order

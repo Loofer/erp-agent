@@ -1,5 +1,6 @@
 """Deep Agents runtime construction for the motor-parts agent."""
 
+import asyncio
 from pathlib import Path
 
 import deepagents
@@ -8,6 +9,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.base import BaseStore
+from langgraph.store.memory import InMemoryStore
 
 from .config import load_settings
 from .memory.prompts import build_system_prompt
@@ -93,3 +95,13 @@ def load_agent_graph(
         checkpointer=checkpointer,
         store=store,
     )
+
+
+def load_langgraph_dev_agent_graph() -> CompiledStateGraph:
+    """Build the graph for ``langgraph dev`` managed persistence."""
+    return load_agent_graph()
+
+
+async def load_langgraph_dev_agent_graph_async() -> CompiledStateGraph:
+    """Build the development graph without blocking LangGraph's event loop."""
+    return await asyncio.to_thread(load_agent_graph)
