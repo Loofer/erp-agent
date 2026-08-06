@@ -4,13 +4,12 @@ import asyncio
 from pathlib import Path
 
 import deepagents
-from langchain.agents.middleware import ToolCallLimitMiddleware
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.base import BaseStore
 
-from .config import load_settings
+from backend.configs.settings import load_settings
 from .memory.prompts import build_system_prompt
 from .memory.runtime import (
     GLOBAL_SKILL_SOURCES,
@@ -20,7 +19,10 @@ from .memory.runtime import (
     build_agent_backend,
     build_runtime_permissions,
 )
-from .middlewares import build_runtime_middlewares
+from .middlewares import RequestContextPromptMiddleware
+from .middlewares.pii_middleware import tool_call_limit_middleware, email_pii_middleware, credit_card_pii_middleware, \
+    api_key_pii_middleware, phone_number_pii_middleware, id_card_pii_middleware
+from .middlewares.prompt_injection_middleware import PromptInjectionMiddleware
 from .rag.hybrid_retriever import HybridRetriever
 from .rag.runtime import build_hybrid_retriever
 from .subagents.loader import (
@@ -68,11 +70,14 @@ def create_main_agent(
         checkpointer=checkpointer,
         store=store,
         middleware=[
-            ToolCallLimitMiddleware(
-                thread_limit=15,
-                run_limit=8,
-            ),
-            *build_runtime_middlewares(),
+            PromptInjectionMiddleware(),
+            RequestContextPromptMiddleware(),
+            tool_call_limit_middleware,
+            email_pii_middleware,
+            credit_card_pii_middleware,
+            api_key_pii_middleware,
+            phone_number_pii_middleware,
+            id_card_pii_middleware,
         ],
         context_schema=MemoryContext,
     )

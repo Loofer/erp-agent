@@ -6,7 +6,7 @@ from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_API_BASE_URL = "http://47.92.108.163:8081"
-DEFAULT_MODEL = "openai:gpt-4.1-mini"
+DEFAULT_MODEL = "gpt-5.4-mini"
 DEFAULT_AGENT_ID = "motorparts-agent"
 DEFAULT_RAG_COLLECTION = "motorparts_knowledge"
 
@@ -97,6 +97,10 @@ class Settings(BaseSettings):
     reranker_enabled: bool = Field(
         default=True,
         validation_alias=AliasChoices("RERANKER_ENABLED", "reranker_enabled"),
+    )
+    log_level: str = Field(
+        default="info",
+        validation_alias=AliasChoices("LOG_LEVEL", "log_level"),
     )
     @field_validator("api_token", mode="before")
     @classmethod

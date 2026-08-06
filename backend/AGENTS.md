@@ -131,7 +131,6 @@ uv run uvicorn src.api_view.web_main:app --reload --port 8000
 ### Primary Agent
 
 Built in `main_agent.py::create_main_agent()`. Receives:
-- `build_parent_tools()` — currently `get_dashboard` (statistics) + `run_bi_text2sql`
 - Bundled system prompt from `memory/prompts.py`
 - Memory routes: `/memory/AGENTS.md` (bundled guidance) and `/memories/AGENTS.md` (user-scoped durable)
 - Skill sources: `/skills/main/` and `/skills/procurement/`

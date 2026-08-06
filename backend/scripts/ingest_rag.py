@@ -5,7 +5,7 @@ from pathlib import Path
 
 from langchain_openai import OpenAIEmbeddings
 
-from agent.config import load_settings
+from backend.configs.settings import load_settings
 from agent.rag.ingest import DirectoryIngestor
 from agent.rag.milvus_store import MilvusChunkStore
 from agent.rag.parsers import ParserRegistry

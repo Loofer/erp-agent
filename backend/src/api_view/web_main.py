@@ -1,51 +1,23 @@
 """FastAPI application composition and chat-runtime lifecycle."""
 
 import asyncio
-import logging
 import logging.config
 from contextlib import asynccontextmanager
+
+from backend.logs.logging_config import setup_logging
 
 # ---------------------------------------------------------------------------
 # Logging — applied at import time, AFTER uvicorn has set up its own handlers.
 # dictConfig always takes effect regardless of pre-existing handler state;
 # basicConfig would silently do nothing once uvicorn touches the root logger.
 # ---------------------------------------------------------------------------
-logging.config.dictConfig(
-    {
-        "version": 1,
-        "disable_existing_loggers": False,  # keep uvicorn's own loggers intact
-        "formatters": {
-            "default": {
-                "format": "%(asctime)s %(name)s [%(levelname)s] %(message)s",
-                "datefmt": "%Y-%m-%d %H:%M:%S",
-            }
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "default",
-                "stream": "ext://sys.stdout",
-            }
-        },
-        "loggers": {
-            # --- framework loggers we care about ---
-            "deepagents": {"level": "DEBUG", "handlers": ["console"], "propagate": False},
-            "langgraph":  {"level": "DEBUG", "handlers": ["console"], "propagate": False},
-            "langchain":  {"level": "INFO",  "handlers": ["console"], "propagate": False},
-            # --- uvicorn — keep its existing level, just normalise the format ---
-            "uvicorn":        {"level": "INFO", "handlers": ["console"], "propagate": False},
-            "uvicorn.error":  {"level": "INFO", "handlers": ["console"], "propagate": False},
-            "uvicorn.access": {"level": "INFO", "handlers": ["console"], "propagate": False},
-        },
-        "root": {"level": "INFO", "handlers": ["console"]},
-    }
-)
+
 
 from fastapi import FastAPI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres import PostgresStore
 
-from agent.config import load_settings
+from backend.configs.settings import load_settings
 from agent.main_agent import load_agent_graph
 from agent.rag.runtime import build_hybrid_retriever
 
@@ -54,6 +26,7 @@ from .chat import router as chat_router
 from .chat_persistence import ConversationRepository
 from .chat_service import ChatService
 
+setup_logging()
 _log = logging.getLogger(__name__)
 
 

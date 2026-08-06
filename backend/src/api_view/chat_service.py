@@ -8,9 +8,10 @@ from typing import Any
 from langgraph.types import Command
 
 from agent.rag.hybrid_retriever import HybridRetriever, render_retrieval_context
+from backend.logs.logging_config import setup_logging
 
 from .chat_persistence import ConversationRepository, ThreadInfo
-
+setup_logging()
 _log = logging.getLogger(__name__)
 
 # Truncate initial_prompt so checkpoint metadata stays compact.
