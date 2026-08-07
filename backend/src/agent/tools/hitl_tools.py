@@ -3,25 +3,45 @@
 from typing import Any
 
 from langchain_core.tools import BaseTool, tool
+from langgraph.types import interrupt
 
 
 @tool(parse_docstring=True)
 def request_order_info(
-    order_draft: dict[str, Any], missing_fields: list[str]
+    order_draft: dict[str, Any], missing_fields: list[str], message: str = ""
 ) -> dict[str, object]:
-    """Request human completion of missing procurement-order data.
+    """Request human input for fields identified by the order-management skill.
 
     Args:
-        order_draft: Current order data, including fields that still need review.
-        missing_fields: Required order fields that need human confirmation.
+        order_draft: Current procurement-order draft to retain while awaiting input.
+        missing_fields: Field paths the agent determined are missing or invalid.
+        message: User-facing question generated from the order-management skill.
 
     Returns:
-        The current order draft and its requested missing fields.
+        The complete draft without an interrupt, or the requested fields and the
+        user's free-text response.
     """
+    if not missing_fields:
+        return {
+            "status": "complete",
+            "order_draft": dict(order_draft),
+            "missing_fields": [],
+        }
+
+    human_response = interrupt(
+        {
+            "kind": "tool_input",
+            "tool_name": "request_order_info",
+            "message": message,
+            "order_draft": dict(order_draft),
+            "missing_fields": list(missing_fields),
+        }
+    )
     return {
-        "status": "human_input_requested",
+        "status": "human_input_received",
         "order_draft": dict(order_draft),
         "missing_fields": list(missing_fields),
+        "human_response": human_response,
     }
 
 
@@ -46,5 +66,5 @@ def request_supplier_info(
 
 
 def build_hitl_tools() -> list[BaseTool]:
-    """Return normal tools whose calls require native human intervention."""
+    """Return tools that collect input through native human intervention."""
     return [request_order_info, request_supplier_info]

@@ -68,6 +68,42 @@ async def test_resume_stream_uses_command_and_thread_configuration() -> None:
     }
 
 
+@pytest.mark.anyio
+async def test_native_tool_input_resumes_with_the_raw_user_value() -> None:
+    from api_view.chat_service import ChatService
+
+    graph = FakeGraph()
+    service = ChatService(graph, None)
+
+    await _collect(service.stream(None, "thread-1", "user-1", "创建人是 7"))
+
+    assert isinstance(graph.input, Command)
+    assert graph.input.resume == "创建人是 7"
+
+
+def test_native_tool_interrupt_is_exposed_as_value_input() -> None:
+    from api_view.chat_service import _interrupt_data
+
+    data = _interrupt_data(
+        {
+            "kind": "tool_input",
+            "tool_name": "request_order_info",
+            "message": "还缺 createdBy",
+            "missing_fields": ["createdBy"],
+        },
+        "thread-1",
+        ["tools:order"],
+    )
+
+    assert data["interrupt_mode"] == "input"
+    assert data["resume_mode"] == "value"
+    assert data["hint"] == "还缺 createdBy"
+
+
+async def _collect(events: AsyncIterator[dict[str, object]]) -> list[dict[str, object]]:
+    return [event async for event in events]
+
+
 class ParentAndSubagentGraph(FakeGraph):
     async def astream(self, **kwargs: Any) -> AsyncIterator[dict[str, object]]:
         self.input = kwargs["input"]

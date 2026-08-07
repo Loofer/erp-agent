@@ -8,17 +8,44 @@ from .http_base import ApiClient
 
 
 def _create_order_request(
-    client: ApiClient, order: dict[str, Any]
+    client: ApiClient, order_payload: dict[str, Any]
 ) -> dict[str, object]:
     """Send an approved procurement order through the shared client."""
-    return client.post("/api/orders/create", dict(order))
+    return client.post("/api/orders/create", order_payload)
 
 
 def _update_order_request(
-    client: ApiClient, order_id: int, order: dict[str, Any]
+    client: ApiClient, order_id: int, order_payload: dict[str, Any]
 ) -> dict[str, object]:
     """Send an approved procurement-order update through the shared client."""
-    return client.put(f"/api/orders/update/{order_id}", dict(order))
+    return client.put(f"/api/orders/update/{order_id}", order_payload)
+
+
+def _erp_order_payload(order_payload: dict[str, Any]) -> dict[str, Any]:
+    """Remove absent optional fields and preserve integer order quantities."""
+    payload = _omit_none(order_payload)
+    order_details = payload.get("orderDetail")
+    if isinstance(order_details, list):
+        for detail in order_details:
+            if not isinstance(detail, dict):
+                continue
+            quantity = detail.get("quantity")
+            if isinstance(quantity, float) and quantity.is_integer():
+                detail["quantity"] = int(quantity)
+    return payload
+
+
+def _omit_none(value: Any) -> Any:
+    """Copy JSON-like data while omitting keys whose value is None."""
+    if isinstance(value, dict):
+        return {
+            key: _omit_none(item)
+            for key, item in value.items()
+            if item is not None
+        }
+    if isinstance(value, list):
+        return [_omit_none(item) for item in value]
+    return value
 
 
 def _search_order_details_request(
@@ -45,31 +72,35 @@ def build_order_tools(client: ApiClient) -> list[BaseTool]:
     """Build procurement-order tools for one configured API client."""
 
     @tool(parse_docstring=True)
-    def create_order(order: dict[str, Any]) -> dict[str, object]:
+    def create_order(order_payload: dict[str, Any]) -> dict[str, object]:
         """Create a procurement order after required human approval.
 
         Args:
-            order: Complete order payload, including orderDetail line items and
-                each line item's partDetail when available.
+            order_payload: Complete order payload. Each orderDetail item uses partId
+                and must not include the read-only partDetail object.
 
         Returns:
             The ERP API response containing the created order.
         """
-        return _create_order_request(client, order)
+        payload = _erp_order_payload(order_payload)
+        return _create_order_request(client, payload)
 
     @tool(parse_docstring=True)
-    def update_order(order_id: int, order: dict[str, Any]) -> dict[str, object]:
+    def update_order(
+        order_id: int, order_payload: dict[str, Any]
+    ) -> dict[str, object]:
         """Update a procurement order after required human approval.
 
         Args:
             order_id: ERP identifier of the procurement order to update.
-            order: Complete replacement payload, including orderDetail line items
-                and each line item's partDetail when available.
+            order_payload: Complete replacement payload. Each orderDetail item uses
+                partId and must not include read-only fields.
 
         Returns:
             The ERP API response containing the updated order.
         """
-        return _update_order_request(client, order_id, order)
+        payload = _erp_order_payload(order_payload)
+        return _update_order_request(client, order_id, payload)
 
     @tool(parse_docstring=True)
     def order_search_details(

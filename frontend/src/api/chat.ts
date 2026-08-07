@@ -110,9 +110,8 @@ export async function fetchThreadMessages(threadId: string): Promise<ChatMessage
 /**
  * POST /api/chat/{thread_id}/resume
  *
- * HITL 恢复。`resume` 直接传给 `Command(resume=...)`，因此必须是
- * HumanInTheLoopMiddleware 期望的 `{ decisions: [...] }` 结构 —— 每个待审
- * 操作对应一个 decision，顺序与 interrupt 的 actions 一致。
+ * HITL 恢复。`resume` 直接传给 `Command(resume=...)`：审批中断使用
+ * `{ decisions: [...] }`，工具内原生输入中断使用用户输入字符串。
  */
 export async function resumeChat(
   threadId: string,
@@ -359,6 +358,7 @@ function _dispatchEvent(
         interrupt_id: parsed.interrupt_id as string | undefined,
         namespace: Array.isArray(parsed.namespace) ? (parsed.namespace as string[]) : [],
         interrupt_mode: parsed.interrupt_mode === 'input' ? 'input' : 'approval',
+        resume_mode: parsed.resume_mode === 'value' ? 'value' : 'decisions',
         allowed_decisions: allowed,
         actions,
         hint: (parsed.hint ?? '') as string,

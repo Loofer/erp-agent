@@ -86,6 +86,9 @@ export interface AgentNode {
  */
 export type InterruptMode = 'approval' | 'input'
 
+/** Shape expected by Command(resume=...) for this interrupt. */
+export type InterruptResumeMode = 'decisions' | 'value'
+
 /** Decisions HumanInTheLoopMiddleware accepts. */
 export type DecisionType = 'approve' | 'edit' | 'reject' | 'respond'
 
@@ -104,6 +107,7 @@ export interface InterruptData {
   /** Namespace of the agent that raised the interrupt */
   namespace: Namespace
   interrupt_mode: InterruptMode
+  resume_mode: InterruptResumeMode
   /** Union of allowed decisions across all pending actions */
   allowed_decisions: DecisionType[]
   /** Tool calls awaiting review */
@@ -124,6 +128,8 @@ export type Decision =
   | { type: 'edit'; edited_action: { name: string; args: Record<string, unknown> } }
   | { type: 'respond'; message: string }
 
-export interface ResumePayload {
+export interface DecisionResumePayload {
   decisions: Decision[]
 }
+
+export type ResumePayload = DecisionResumePayload | string

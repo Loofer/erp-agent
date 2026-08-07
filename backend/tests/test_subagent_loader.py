@@ -69,9 +69,6 @@ def test_shipped_subagent_definitions_cover_research_analysis_and_order() -> Non
     assert analyst_definition.skills == ("/skills/procurement/",)
     assert order_definition.skills == ("/skills/order/",)
     assert order_definition.interrupt_on == {
-        "request_order_info": {
-            "allowed_decisions": ["respond"],
-        },
         "create_order": {
             "allowed_decisions": ["approve", "reject"],
         },

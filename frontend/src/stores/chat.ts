@@ -73,6 +73,10 @@ export const useChatStore = defineStore('chat', () => {
 
   async function resumeInput(inputText: string) {
     if (!pendingInterrupt.value || pendingInterrupt.value.interrupt_mode !== 'input') return
+    if (pendingInterrupt.value.resume_mode === 'value') {
+      await resumeWithData(inputText)
+      return
+    }
     await resumeWithData({
       decisions: pendingInterrupt.value.actions.map(() => ({
         type: 'respond' as const,

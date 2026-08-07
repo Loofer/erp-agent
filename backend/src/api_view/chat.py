@@ -58,7 +58,7 @@ class ChatStreamRequest(BaseModel):
 
 
 class ResumeRequest(BaseModel):
-    resume: dict[str, Any]
+    resume: str | dict[str, Any]
 
 
 # ---------------------------------------------------------------------------

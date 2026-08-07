@@ -48,3 +48,17 @@ def test_request_rejects_non_object_responses() -> None:
 
     with pytest.raises(ApiClientError, match="was not an object"):
         client.get("/api/statistics/dashboard")
+
+
+def test_request_logs_raw_erp_error_response(caplog: pytest.LogCaptureFixture) -> None:
+    client = ApiClient(
+        "https://motorparts.test",
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(400, text='{"message":"invalid part"}')
+        ),
+    )
+
+    with pytest.raises(ApiClientError, match="invalid part"):
+        client.post("/api/orders/create", {"orderNumber": "PO-001"})
+
+    assert 'ERP POST /api/orders/create returned HTTP 400: {"message":"invalid part"}' in caplog.text

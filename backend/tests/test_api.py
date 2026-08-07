@@ -12,8 +12,11 @@ def test_health_is_available_in_process() -> None:
 
 
 def test_resume_endpoint_streams_service_events(monkeypatch) -> None:
+    received: dict[str, object] = {}
+
     class FakeChatService:
         async def stream(self, **kwargs):
+            received.update(kwargs)
             yield {"event": "complete", "data": {"thread_id": "thread-1"}}
 
     monkeypatch.setitem(
@@ -27,11 +30,12 @@ def test_resume_endpoint_streams_service_events(monkeypatch) -> None:
         headers={
             "Authorization": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTEiLCJ1c2VybmFtZSI6IlRlc3QgVXNlciJ9."
         },
-        json={"resume": {"supplement": "ABC"}},
+        json={"resume": "创建人是 7"},
     )
 
     assert response.status_code == 200
     assert "event: complete" in response.text
+    assert received["resume_data"] == "创建人是 7"
 
 
 def test_application_lifespan_initializes_chat_service() -> None:

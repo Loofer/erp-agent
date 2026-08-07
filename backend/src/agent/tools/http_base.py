@@ -1,8 +1,11 @@
 """HTTP boundary for ordinary in-process domain tools."""
 
+import logging
 from typing import Any
 
 import httpx
+
+_log = logging.getLogger(__name__)
 
 
 class ApiClientError(RuntimeError):
@@ -42,17 +45,35 @@ class ApiClient:
                 params=query or {},
                 json=body,
             )
-            response.raise_for_status()
-            payload: Any = response.json()
         except httpx.HTTPError as exc:
             raise ApiClientError(f"Request for {operation} failed: {exc}") from exc
+
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raw_body = exc.response.text
+            _log.error("ERP %s returned HTTP %s: %s", operation, exc.response.status_code, raw_body)
+            raise ApiClientError(
+                f"Request for {operation} failed with HTTP {exc.response.status_code}: "
+                f"{raw_body}"
+            ) from exc
+
+        try:
+            payload: Any = response.json()
         except ValueError as exc:
-            raise ApiClientError(f"Response for {operation} was not JSON.") from exc
+            _log.error("ERP %s returned a non-JSON body: %s", operation, response.text)
+            raise ApiClientError(
+                f"Response for {operation} was not JSON: {response.text}"
+            ) from exc
         if not isinstance(payload, dict):
+            _log.error("ERP %s returned a non-object body: %s", operation, response.text)
             raise ApiClientError(f"Response for {operation} was not an object.")
         code = payload.get("code")
         if isinstance(code, int) and code >= 400:
-            raise ApiClientError(f"API operation {operation} failed with code {code}.")
+            _log.error("ERP %s returned error code %s: %s", operation, code, response.text)
+            raise ApiClientError(
+                f"API operation {operation} failed with code {code}: {response.text}"
+            )
         return payload
 
     def get(

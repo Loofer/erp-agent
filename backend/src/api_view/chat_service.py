@@ -50,7 +50,7 @@ class ChatService:
         message: str | None,
         thread_id: str,
         user_id: str,
-        resume_data: dict[str, object] | None = None,
+        resume_data: str | dict[str, object] | None = None,
         user_name: str | None = None,
     ) -> AsyncIterator[dict[str, object]]:
         if resume_data is None and message is None:
@@ -250,13 +250,17 @@ def _interrupt_data(
          "review_configs": [{"action_name", "allowed_decisions"}]}
     and expect ``Command(resume={"decisions": [...]})`` to continue.  The
     allowed decisions come straight from each tool's review config, so the UI
-    can render exactly the buttons the graph will accept.
+    can render exactly the buttons the graph will accept. Native tool-input
+    interrupts carry ``{"kind": "tool_input", ...}`` and resume with raw text.
     """
     raw_value = getattr(item, "value", item)
     interrupt_id = getattr(item, "id", None)
 
     actions: list[dict[str, object]] = []
     decisions: list[str] = []
+    is_tool_input = (
+        isinstance(raw_value, dict) and raw_value.get("kind") == "tool_input"
+    )
     if isinstance(raw_value, dict):
         decisions_by_action: dict[str, list[str]] = {}
         for config in raw_value.get("review_configs") or []:
@@ -281,15 +285,22 @@ def _interrupt_data(
             )
             decisions.extend(d for d in allowed if d not in decisions)
 
-    # "respond" is the only decision that needs the user to type something.
-    interrupt_mode = "input" if decisions == [_INPUT_DECISION] else "approval"
-    hint = _INPUT_HINT if interrupt_mode == "input" else _APPROVAL_HINT
+    # Native tool-input interrupts resume with the input value itself. HITL
+    # middleware input interrupts retain their decisions/respond envelope.
+    is_input = is_tool_input or decisions == [_INPUT_DECISION]
+    interrupt_mode = "input" if is_input else "approval"
+    resume_mode = "value" if is_tool_input else "decisions"
+    if is_tool_input:
+        hint = str(raw_value.get("message") or _INPUT_HINT)
+    else:
+        hint = _INPUT_HINT if is_input else _APPROVAL_HINT
 
     return {
         "thread_id": thread_id,
         "interrupt_id": interrupt_id,
         "namespace": namespace,
         "interrupt_mode": interrupt_mode,
+        "resume_mode": resume_mode,
         "allowed_decisions": decisions,
         "actions": actions,
         "hint": hint,
