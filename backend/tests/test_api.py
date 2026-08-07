@@ -43,6 +43,13 @@ def test_resume_endpoint_streams_service_events(monkeypatch) -> None:
 
 
 def test_application_lifespan_initializes_chat_service(monkeypatch) -> None:
+    class FakeModalSandbox:
+        def __init__(self) -> None:
+            self.termination_wait_values: list[bool] = []
+
+        def terminate(self, *, wait: bool = False) -> None:
+            self.termination_wait_values.append(wait)
+
     class FakeStore:
         @classmethod
         def from_conn_string(cls, _: str) -> "FakeStore":
@@ -80,11 +87,31 @@ def test_application_lifespan_initializes_chat_service(monkeypatch) -> None:
         async def setup(self) -> None:
             return None
 
+    modal_sandbox = FakeModalSandbox()
+    modal_backend = object()
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(web_main, "create_modal_sandbox", lambda: modal_sandbox)
+    monkeypatch.setattr(
+        web_main,
+        "create_modal_backend",
+        lambda sandbox: modal_backend if sandbox is modal_sandbox else None,
+    )
     monkeypatch.setattr(web_main, "PostgresStore", FakeStore)
     monkeypatch.setattr(web_main, "AsyncPostgresSaver", FakeSaver)
     monkeypatch.setattr(web_main, "ConversationRepository", FakeConversationRepository)
     monkeypatch.setattr(web_main, "build_hybrid_retriever", lambda _: None)
-    monkeypatch.setattr(web_main, "load_agent_graph", lambda **_: object())
+
+    def fake_load_agent_graph(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(web_main, "load_agent_graph", fake_load_agent_graph)
 
     with TestClient(app):
         assert app.state.chat_service is not None
+        assert app.state.modal_sandbox is modal_sandbox
+        assert app.state.modal_backend is modal_backend
+        assert captured["sandbox_backend"] is modal_backend
+
+    assert modal_sandbox.termination_wait_values == [True]

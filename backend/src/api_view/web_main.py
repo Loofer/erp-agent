@@ -4,6 +4,7 @@ import asyncio
 import logging.config
 from contextlib import asynccontextmanager
 
+from backend.configs.settings import load_settings
 from backend.logs.logging_config import setup_logging
 
 # ---------------------------------------------------------------------------
@@ -11,15 +12,13 @@ from backend.logs.logging_config import setup_logging
 # dictConfig always takes effect regardless of pre-existing handler state;
 # basicConfig would silently do nothing once uvicorn touches the root logger.
 # ---------------------------------------------------------------------------
-
-
 from fastapi import FastAPI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres import PostgresStore
 
-from backend.configs.settings import load_settings
 from agent.main_agent import load_agent_graph
 from agent.rag.runtime import build_hybrid_retriever
+from agent.sandbox import create_modal_backend, create_modal_sandbox
 
 from .auth import JwtIdentityMiddleware
 from .chat import router as chat_router
@@ -40,37 +39,50 @@ async def lifespan(app: FastAPI):
     """
     settings = load_settings()
 
-    with PostgresStore.from_conn_string(settings.database_url) as store:
-        store.setup()
-        async with AsyncPostgresSaver.from_conn_string(
-            settings.database_url
-        ) as checkpointer:
-            await checkpointer.setup()
-            conversations = ConversationRepository(checkpointer.conn)
-            await conversations.setup()
+    _log.info("Creating Modal Sandbox for app erp-agent.")
+    modal_sandbox = await asyncio.to_thread(create_modal_sandbox)
+    modal_backend = create_modal_backend(modal_sandbox)
+    app.state.modal_sandbox = modal_sandbox
+    app.state.modal_backend = modal_backend
 
-            rag_retriever = None
-            try:
-                rag_retriever = await asyncio.to_thread(build_hybrid_retriever, settings)
-            except Exception:  # noqa: BLE001
-                _log.exception("RAG initialisation failed; continuing without retrieval")
+    try:
+        with PostgresStore.from_conn_string(settings.database_url) as store:
+            store.setup()
+            async with AsyncPostgresSaver.from_conn_string(
+                settings.database_url
+            ) as checkpointer:
+                await checkpointer.setup()
+                conversations = ConversationRepository(checkpointer.conn)
+                await conversations.setup()
 
-            _log.info("Initialising agent graph......")
-            graph = await asyncio.to_thread(
-                load_agent_graph,
-                checkpointer=checkpointer,
-                store=store,
-                rag_retriever=rag_retriever,
-            )
-            _log.info("Agent graph ready.")
+                rag_retriever = None
+                try:
+                    rag_retriever = await asyncio.to_thread(
+                        build_hybrid_retriever, settings
+                    )
+                except Exception:  # noqa: BLE001
+                    _log.exception("RAG initialisation failed; continuing without retrieval")
 
-            app.state.chat_service = ChatService(
-                graph,
-                conversations,
-                agent_id=settings.agent_id,
-                rag_retriever=rag_retriever,
-            )
-            yield
+                _log.info("Initialising agent graph......")
+                graph = await asyncio.to_thread(
+                    load_agent_graph,
+                    checkpointer=checkpointer,
+                    store=store,
+                    rag_retriever=rag_retriever,
+                    sandbox_backend=modal_backend,
+                )
+                _log.info("Agent graph ready.")
+
+                app.state.chat_service = ChatService(
+                    graph,
+                    conversations,
+                    agent_id=settings.agent_id,
+                    rag_retriever=rag_retriever,
+                )
+                yield
+    finally:
+        _log.info("Terminating Modal Sandbox.")
+        await asyncio.to_thread(modal_sandbox.terminate, wait=True)
 
 
 app = FastAPI(title="Motorparts Agent", lifespan=lifespan)

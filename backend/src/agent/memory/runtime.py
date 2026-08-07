@@ -11,6 +11,7 @@ from deepagents.backends import (
     StateBackend,
     StoreBackend,
 )
+from deepagents.backends.protocol import BackendProtocol
 from langgraph.runtime import Runtime
 
 _SAFE_NAMESPACE_COMPONENT = re.compile(r"^[A-Za-z0-9\-_.@+:~]+$")
@@ -40,12 +41,16 @@ def assistant_memory_namespace(
     return (agent_id, user_id, "memories")
 
 
-def build_agent_backend() -> CompositeBackend:
-    """Expose bundled guidance and a durable, user-isolated memory route."""
+def build_agent_backend(
+        default_backend: BackendProtocol | None = None,
+) -> CompositeBackend:
+    """Expose sandbox execution plus bundled and durable filesystem routes."""
     backend_root = Path(__file__).resolve().parents[3]
+    runtime_backend = default_backend or StateBackend()
     return CompositeBackend(
-        default=StateBackend(),
+        default=runtime_backend,
         routes={
+            "/sandbox/": runtime_backend,
             "/memory/": FilesystemBackend(
                 root_dir=backend_root / "src" / "agent" / "memory",
                 virtual_mode=True,

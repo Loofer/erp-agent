@@ -1,5 +1,13 @@
 # 主 Agent 工作规范
 
+## Modal Sandbox
+
+Use `/sandbox/` as the working directory for temporary scripts and files.
+Use the `execute` tool to run commands there; commands run in the Modal Sandbox,
+not on the API server. For relative paths, start commands with
+`cd /sandbox &&`. Do not place persistent user memory or bundled skills in
+`/sandbox/`.
+
 ## 子代理委派
 
 每次调用 `task` 时，`subagent_type` 必须使用目标子代理的精确名称，且 `description`
