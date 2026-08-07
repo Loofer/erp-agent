@@ -1,5 +1,5 @@
 ---
-name: procurement‑analysis
+name: procurement-analysis
 description: >
   采购分析主技能包。串联完整分析流程：需求拆解 → 数据收集 → 执行分析 → 生成图表 → 输出报告。
   仅使用内部ERP数据，完成供应商对比、价格分析、物料筛选、采购策略评估。
