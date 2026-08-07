@@ -169,6 +169,25 @@ class PromptInjectionMiddleware(AgentMiddleware):
                         raise PermissionError("安全拦截：禁止执行高危命令")
         return handler(request)
 
+    async def awrap_tool_call(self, request, handler: Callable):
+        """异步工具调用防护，与 wrap_tool_call 保持一致。"""
+        tool_name = request.tool_call["name"]
+        args = request.tool_call.get("args", {})
+        forbidden_tools = {"bash", "shell"}
+        if tool_name in forbidden_tools:
+            cmd = str(args.get("command", ""))
+            bad_patterns = [
+                r"rm\s+-rf",
+                r"rm\s+-r",
+                r"chmod\s+777",
+            ]
+            for bad in bad_patterns:
+                if re.search(bad, cmd):
+                    _logger.warning("Block dangerous shell command: %s", cmd)
+                    if not self.dry_run:
+                        raise PermissionError("安全拦截：禁止执行高危命令")
+        return await handler(request)
+
 
 def main():
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")

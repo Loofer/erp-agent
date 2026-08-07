@@ -23,10 +23,7 @@ def test_main_agent_uses_native_hitl_and_loaded_subagents(
 
     assert graph is not None
     assert captured["model"] == "test:model"
-    assert {tool.name for tool in captured["tools"]} == {
-        "get_dashboard",
-        "run_bi_text2sql",
-    }
+    assert {tool.name for tool in captured["tools"]} == {"search_knowdge"}
     assert captured["subagents"] == []
     assert "interrupt_on" not in captured
     assert captured["memory"] == ["/memory/AGENTS.md", "/memories/AGENTS.md"]
@@ -92,11 +89,13 @@ def test_deployment_entrypoint_loads_yaml_before_creating_main_agent(
         subagents: tuple[SubagentDefinition, ...],
         checkpointer: object | None = None,
         store: object | None = None,
+        rag_retriever: object | None = None,
     ) -> object:
         captured["model"] = model
         captured["subagents"] = subagents
         captured["checkpointer"] = checkpointer
         captured["store"] = store
+        captured["rag_retriever"] = rag_retriever
         return expected_graph
 
     monkeypatch.setattr(main_agent_module, "create_main_agent", fake_create_main_agent)

@@ -5,12 +5,13 @@ from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from typing import Any
 
+from backend.logs.logging_config import setup_logging
 from langgraph.types import Command
 
 from agent.rag.hybrid_retriever import HybridRetriever, render_retrieval_context
-from backend.logs.logging_config import setup_logging
 
 from .chat_persistence import ConversationRepository, ThreadInfo
+
 setup_logging()
 _log = logging.getLogger(__name__)
 
@@ -179,7 +180,13 @@ class ChatService:
     async def get_thread_messages(
         self, thread_id: str, user_id: str
     ) -> list[dict[str, object]]:
-        """Return the human/AI messages stored in a thread's checkpoint state."""
+        """Return a flat, user-visible timeline from the checkpoint state.
+
+        ``messages`` is the durable LangGraph state.  Keeping the projection
+        here means history uses the same checkpoint source as normal chat,
+        without a second event-log table.  Tool calls and ToolMessages are
+        retained as independent timeline items instead of being discarded.
+        """
         config = {
             "configurable": {
                 "thread_id": thread_id,
@@ -192,7 +199,7 @@ class ChatService:
         if state is None or not state.values:
             return []
         raw_messages = state.values.get("messages", [])
-        return [s for m in raw_messages if (s := _serialize_message(m)) is not None]
+        return _serialize_timeline(raw_messages)
 
     def _get_graph(self) -> Any:
         if self._graph is None:
@@ -292,12 +299,107 @@ def _interrupt_data(
     }
 
 
-def _serialize_message(message: object) -> "dict[str, object] | None":
-    """Serialize a LangChain message to a simple {id, role, content} dict.
+def _serialize_timeline(messages: object) -> list[dict[str, object]]:
+    """Project checkpoint messages into chronological flat timeline entries.
 
-    Returns None for messages that should not be surfaced in the UI
-    (tool messages, system messages, empty AI tool-call stubs).
+    System messages are agent configuration and remain private.  The public
+    message state does not reliably retain every inner subgraph token after a
+    restart, but it does retain root conversation messages, tool calls, and
+    tool results.  Live SSE continues to display subagent output as it arrives.
     """
+    if not isinstance(messages, list):
+        return []
+
+    timeline: list[dict[str, object]] = []
+    tool_call_positions: dict[str, int] = {}
+    for message in messages:
+        model_dump = getattr(message, "model_dump", None)
+        data: dict = (
+            model_dump() if callable(model_dump)
+            else (message if isinstance(message, dict) else {})
+        )
+        msg_type = data.get("type", "")
+        message_id = str(data.get("id") or "")
+
+        if msg_type == "human":
+            timeline.append(
+                {
+                    "id": message_id,
+                    "kind": "user",
+                    "role": "user",
+                    "content": _content_text(data.get("content", "")),
+                    "actor_name": data.get("name"),
+                }
+            )
+            continue
+
+        if msg_type == "ai":
+            content = _content_text(data.get("content", ""))
+            if content:
+                timeline.append(
+                    {
+                        "id": message_id,
+                        "kind": "assistant",
+                        "role": "assistant",
+                        "content": content,
+                        "actor_name": data.get("name"),
+                    }
+                )
+            for position, call in enumerate(data.get("tool_calls") or []):
+                if not isinstance(call, dict):
+                    continue
+                tool_call_id = str(call.get("id") or f"{message_id}:{position}")
+                tool_call_positions[tool_call_id] = len(timeline)
+                timeline.append(
+                    {
+                        "id": f"tool-call:{tool_call_id}",
+                        "kind": "tool_call",
+                        "content": "",
+                        "actor_name": data.get("name"),
+                        "tool_call_id": tool_call_id,
+                        "tool_name": str(call.get("name") or "tool"),
+                        "tool_args": call.get("args") or {},
+                        "status": "running",
+                    }
+                )
+            continue
+
+        if msg_type == "tool":
+            tool_call_id = str(data.get("tool_call_id") or message_id)
+            status = "error" if data.get("status") == "error" else "success"
+            call_position = tool_call_positions.get(tool_call_id)
+            if call_position is not None:
+                timeline[call_position]["status"] = status
+            timeline.append(
+                {
+                    "id": message_id or f"tool-result:{tool_call_id}",
+                    "kind": "tool_result",
+                    "content": _content_text(data.get("content", "")),
+                    "actor_name": data.get("name"),
+                    "tool_call_id": tool_call_id,
+                    "tool_name": data.get("name"),
+                    "status": status,
+                }
+            )
+
+    return timeline
+
+
+def _content_text(content: object) -> str:
+    """Extract text from either standard or multimodal LangChain content."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            str(block.get("text", ""))
+            for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        )
+    return str(content) if content is not None else ""
+
+
+def _serialize_message(message: object) -> "dict[str, object] | None":
+    """Backward-compatible helper for callers expecting one visible message."""
     model_dump = getattr(message, "model_dump", None)
     data: dict = (
         model_dump() if callable(model_dump)
@@ -312,14 +414,7 @@ def _serialize_message(message: object) -> "dict[str, object] | None":
     else:
         return None  # tool / system / function messages — skip
 
-    content = data.get("content", "")
-    if isinstance(content, list):
-        # ContentBlock list: extract text parts only
-        content = "".join(
-            block.get("text", "")
-            for block in content
-            if isinstance(block, dict) and block.get("type") == "text"
-        )
+    content = _content_text(data.get("content", ""))
 
     # Skip AI messages that carry only tool_calls and have no visible text
     if not content and role == "assistant":

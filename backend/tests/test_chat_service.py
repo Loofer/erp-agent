@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.types import Command
 
 
@@ -117,3 +118,43 @@ async def test_stream_preserves_parent_and_subagent_identity() -> None:
     assert chunks[1]["namespace"] == []
     assert chunks[1]["meta"]["lc_agent_name"] == "erp-agent"
     assert chunks[1]["data"]["content"] == "final answer"
+
+
+def test_checkpoint_messages_become_a_flat_timeline_with_tool_results() -> None:
+    from api_view.chat_service import _serialize_timeline
+
+    timeline = _serialize_timeline(
+        [
+            HumanMessage(content="show order status", id="human-1"),
+            AIMessage(
+                content="",
+                id="ai-1",
+                tool_calls=[
+                    {
+                        "id": "call-1",
+                        "name": "order_search_details",
+                        "args": {"partName": "brake pad"},
+                    }
+                ],
+            ),
+            ToolMessage(
+                content='{"orders": 3}',
+                id="tool-1",
+                tool_call_id="call-1",
+                name="order_search_details",
+            ),
+            AIMessage(content="Three orders were found.", id="ai-2"),
+        ]
+    )
+
+    assert [item["kind"] for item in timeline] == [
+        "user",
+        "tool_call",
+        "tool_result",
+        "assistant",
+    ]
+    assert timeline[1]["tool_name"] == "order_search_details"
+    assert timeline[1]["tool_args"] == {"partName": "brake pad"}
+    assert timeline[1]["status"] == "success"
+    assert timeline[2]["tool_call_id"] == "call-1"
+    assert timeline[2]["content"] == '{"orders": 3}'

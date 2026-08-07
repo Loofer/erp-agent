@@ -4,12 +4,12 @@ import asyncio
 from pathlib import Path
 
 import deepagents
+from backend.configs.settings import load_settings
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.base import BaseStore
 
-from backend.configs.settings import load_settings
 from .memory.prompts import build_system_prompt
 from .memory.runtime import (
     GLOBAL_SKILL_SOURCES,
@@ -20,8 +20,14 @@ from .memory.runtime import (
     build_runtime_permissions,
 )
 from .middlewares import RequestContextPromptMiddleware
-from .middlewares.pii_middleware import tool_call_limit_middleware, email_pii_middleware, credit_card_pii_middleware, \
-    api_key_pii_middleware, phone_number_pii_middleware, id_card_pii_middleware
+from .middlewares.pii_middleware import (
+    api_key_pii_middleware,
+    credit_card_pii_middleware,
+    email_pii_middleware,
+    id_card_pii_middleware,
+    phone_number_pii_middleware,
+    tool_call_limit_middleware,
+)
 from .middlewares.prompt_injection_middleware import PromptInjectionMiddleware
 from .rag.hybrid_retriever import HybridRetriever
 from .rag.runtime import build_hybrid_retriever

@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from agent.middlewares.prompt_injection_middleware import (
@@ -54,3 +57,34 @@ def test_dry_run_detects_without_blocking() -> None:
     )
 
     assert result is None
+
+
+@pytest.mark.anyio
+async def test_awrap_tool_call_forwards_safe_requests() -> None:
+    middleware = PromptInjectionMiddleware()
+    request = SimpleNamespace(tool_call={"name": "shell", "args": {"command": "ls"}})
+
+    async def handler(received_request: object) -> str:
+        assert received_request is request
+        return "tool result"
+
+    assert await middleware.awrap_tool_call(request, handler) == "tool result"
+
+
+@pytest.mark.anyio
+async def test_awrap_tool_call_blocks_dangerous_shell_command() -> None:
+    middleware = PromptInjectionMiddleware()
+    request = SimpleNamespace(
+        tool_call={"name": "shell", "args": {"command": "rm -rf /tmp/data"}}
+    )
+    handler_called = False
+
+    async def handler(_: object) -> str:
+        nonlocal handler_called
+        handler_called = True
+        return "tool result"
+
+    with pytest.raises(PermissionError, match="安全拦截"):
+        await middleware.awrap_tool_call(request, handler)
+
+    assert not handler_called

@@ -18,7 +18,11 @@ system_prompt: |
 tools:
   - create_supplier
   - search_suppliers
+  - request_supplier_info
 interrupt_on:
+  request_supplier_info:
+    allowed_decisions:
+      - respond
   create_supplier:
     allowed_decisions:
       - approve

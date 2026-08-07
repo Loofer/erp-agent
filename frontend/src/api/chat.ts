@@ -1,10 +1,7 @@
 import type {
-  AgentNode,
   DecisionType,
   InterruptAction,
   InterruptData,
-  MessageMeta,
-  Namespace,
   ResumePayload,
 } from '@/types/agent'
 
@@ -23,10 +20,15 @@ function authHeaders(): HeadersInit {
 
 export interface ChatMessage {
   id: string
-  role: 'user' | 'assistant'
+  kind: 'user' | 'assistant' | 'tool_call' | 'tool_result'
+  role?: 'user' | 'assistant'
   content: string
+  actorName?: string
+  toolCallId?: string
+  toolName?: string
+  toolArgs?: Record<string, unknown>
+  status?: 'running' | 'success' | 'error'
   loading?: boolean
-  executionNodes?: AgentNode[]
   interrupted?: InterruptData
 }
 
@@ -79,12 +81,26 @@ export async function fetchThreadMessages(threadId: string): Promise<ChatMessage
       headers: authHeaders(),
     })
     if (!res.ok) return []
-    const data: { messages: Array<{ id: string; role: string; content: string }> } =
-      await res.json()
+    const data: { messages: Array<Record<string, unknown>> } = await res.json()
     return (data.messages ?? []).map((m) => ({
-      id: m.id || crypto.randomUUID(),
-      role: m.role === 'user' ? 'user' : 'assistant',
-      content: m.content,
+      id: typeof m.id === 'string' && m.id ? m.id : crypto.randomUUID(),
+      kind:
+        m.kind === 'tool_call' || m.kind === 'tool_result' || m.kind === 'user'
+          ? m.kind
+          : 'assistant',
+      role: m.role === 'user' ? 'user' : m.role === 'assistant' ? 'assistant' : undefined,
+      content: typeof m.content === 'string' ? m.content : '',
+      actorName: typeof m.actor_name === 'string' ? m.actor_name : undefined,
+      toolCallId: typeof m.tool_call_id === 'string' ? m.tool_call_id : undefined,
+      toolName: typeof m.tool_name === 'string' ? m.tool_name : undefined,
+      toolArgs:
+        m.tool_args && typeof m.tool_args === 'object'
+          ? (m.tool_args as Record<string, unknown>)
+          : undefined,
+      status:
+        m.status === 'running' || m.status === 'success' || m.status === 'error'
+          ? m.status
+          : undefined,
     }))
   } catch {
     return []
@@ -129,21 +145,22 @@ export interface ToolCallStart {
   id: string
   name: string
   args: Record<string, unknown>
-  namespace: Namespace
   agentName?: string
 }
 
 export interface StreamCallbacks {
   onConversation: (threadId: string) => void
   /** AI 文本增量；namespace 用于区分主 agent 与子 agent 的输出 */
-  onChunk: (chunk: string, namespace: Namespace, meta: MessageMeta) => void
+  onChunk: (chunk: string, messageId: string, agentName?: string) => void
   /** AI 决定调用工具 */
   onToolCallStart: (calls: ToolCallStart[]) => void
   /** 工具执行完毕，返回结果 */
   onToolResult: (result: {
+    id: string
     tool_call_id: string
     content: string
-    namespace: Namespace
+    toolName?: string
+    isError: boolean
   }) => void
   onInterrupt: (data: InterruptData) => void
   onDone: () => void
@@ -255,14 +272,11 @@ async function _consumeSseStream(
   }
 }
 
-function _namespaceOf(parsed: Record<string, unknown>): Namespace {
-  const ns = parsed.namespace
-  return Array.isArray(ns) ? (ns as Namespace) : []
-}
-
-function _metaOf(parsed: Record<string, unknown>): MessageMeta {
+function _agentNameOf(parsed: Record<string, unknown>): string | undefined {
   const meta = parsed.meta
-  return meta && typeof meta === 'object' ? (meta as MessageMeta) : {}
+  if (!meta || typeof meta !== 'object') return undefined
+  const name = (meta as Record<string, unknown>).lc_agent_name
+  return typeof name === 'string' ? name : undefined
 }
 
 function _dispatchEvent(
@@ -279,21 +293,23 @@ function _dispatchEvent(
       break
 
     case 'message_chunk': {
-      const namespace = _namespaceOf(parsed)
-      const meta = _metaOf(parsed)
-      const agentName = meta.lc_agent_name
+      const agentName = _agentNameOf(parsed)
       const msgType = parsed.type as string | undefined
+      const messageId =
+        typeof parsed.id === 'string' && parsed.id
+          ? parsed.id
+          : `assistant:${agentName ?? 'main'}`
 
       // 情况 1：AI 文本内容流。仅接受 ai 消息，避免把 ToolMessage 的
       // content 当成助手文本追加到气泡里。
       if (msgType === 'ai' || msgType === 'AIMessageChunk') {
         const content = parsed.content
         if (typeof content === 'string' && content) {
-          onChunk(content, namespace, meta)
+          onChunk(content, messageId, agentName)
         } else if (Array.isArray(content)) {
           for (const block of content) {
             if (block?.type === 'text' && block.text) {
-              onChunk(block.text as string, namespace, meta)
+              onChunk(block.text as string, messageId, agentName)
             }
           }
         }
@@ -307,7 +323,6 @@ function _dispatchEvent(
             id: (tc.id ?? '') as string,
             name: (tc.name ?? '') as string,
             args: (tc.args ?? {}) as Record<string, unknown>,
-            namespace,
             agentName,
           })),
         )
@@ -316,12 +331,17 @@ function _dispatchEvent(
       // 情况 3：工具执行结果（ToolMessage 带 tool_call_id）
       if (parsed.tool_call_id) {
         onToolResult({
+          id:
+            typeof parsed.id === 'string' && parsed.id
+              ? parsed.id
+              : `tool-result:${parsed.tool_call_id as string}`,
           tool_call_id: parsed.tool_call_id as string,
           content:
             typeof parsed.content === 'string'
               ? parsed.content
               : JSON.stringify(parsed.content ?? ''),
-          namespace,
+          toolName: typeof parsed.name === 'string' ? parsed.name : undefined,
+          isError: parsed.status === 'error',
         })
       }
       break
@@ -337,7 +357,7 @@ function _dispatchEvent(
       onInterrupt({
         thread_id: (parsed.thread_id ?? '') as string,
         interrupt_id: parsed.interrupt_id as string | undefined,
-        namespace: _namespaceOf(parsed),
+        namespace: Array.isArray(parsed.namespace) ? (parsed.namespace as string[]) : [],
         interrupt_mode: parsed.interrupt_mode === 'input' ? 'input' : 'approval',
         allowed_decisions: allowed,
         actions,
