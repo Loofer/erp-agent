@@ -4,17 +4,14 @@ import asyncio
 from pathlib import Path
 
 import deepagents
-from backend.configs.settings import load_settings
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.base import BaseStore
 
+from backend.configs.settings import load_settings
 from .memory.prompts import build_system_prompt
 from .memory.runtime import (
-    GLOBAL_SKILL_SOURCES,
-    MEMORY_PATH,
-    PERSISTENT_MEMORY_PATH,
     MemoryContext,
     build_agent_backend,
     build_runtime_permissions,
@@ -68,8 +65,8 @@ def create_main_agent(
         tools=parent_tools,
         system_prompt=build_system_prompt(),
         subagents=deep_agent_subagents,
-        skills=GLOBAL_SKILL_SOURCES,
-        memory=[MEMORY_PATH, PERSISTENT_MEMORY_PATH],
+        skills=["/skills/main/"],
+        memory=["/memory/AGENTS.md", "/memories/preferences.md"],
         backend=build_agent_backend(),
         debug=settings.debug,
         permissions=build_runtime_permissions(),

@@ -1,4 +1,4 @@
-from agent.config import load_settings
+from backend.configs.settings import load_settings
 
 
 def test_load_settings_uses_database_url(monkeypatch) -> None:

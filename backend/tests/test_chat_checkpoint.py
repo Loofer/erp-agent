@@ -1,11 +1,11 @@
+import os
 from typing import TypedDict
 
 import pytest
+from backend.configs.settings import load_settings
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
-
-from agent.config import load_settings
 
 
 class ApprovalState(TypedDict):
@@ -25,6 +25,10 @@ def create_approval_graph(checkpointer: AsyncPostgresSaver):
     return builder.compile(checkpointer=checkpointer)
 
 
+@pytest.mark.skipif(
+    os.getenv("RUN_POSTGRES_INTEGRATION") != "1",
+    reason="requires an explicitly enabled PostgreSQL integration environment",
+)
 @pytest.mark.anyio
 async def test_postgres_checkpoint_resumes_after_reopening_database() -> None:
     database_url = load_settings().database_url

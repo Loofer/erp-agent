@@ -13,9 +13,6 @@ from deepagents.backends import (
 )
 from langgraph.runtime import Runtime
 
-MEMORY_PATH = "/memory/AGENTS.md"
-PERSISTENT_MEMORY_PATH = "/memories/AGENTS.md"
-GLOBAL_SKILL_SOURCES = ["/skills/main/", "/skills/procurement/"]
 _SAFE_NAMESPACE_COMPONENT = re.compile(r"^[A-Za-z0-9\-_.@+:~]+$")
 
 
@@ -63,11 +60,27 @@ def build_agent_backend() -> CompositeBackend:
 
 
 def build_runtime_permissions() -> list[FilesystemPermission]:
-    """Keep bundled policy and skill files immutable to agent tool calls."""
+    """Keep bundled policy and skill files immutable to agent tool calls.
+    - /memory/**、/skills/**：只可读，禁止写入/编辑/删除
+    - /memories/**：用户长期记忆，允许读写
+    """
     return [
+        # 1. 禁止对静态共享资源执行任何写操作；读不受这条影响
         FilesystemPermission(
             operations=["write"],
             paths=["/memory/**", "/skills/**"],
             mode="deny",
-        )
+        ),
+        # 2. 用户记忆路径：允许 read + write
+        FilesystemPermission(
+            operations=["read", "write"],
+            paths=["/memories/**"],
+            mode="allow",
+        ),
+        # 👉 没有加全局 deny，如果你需要严格白名单再追加下面这条
+        # FilesystemPermission(
+        #     operations=["read", "write"],
+        #     paths=["/**"],
+        #     mode="deny",
+        # ),
     ]

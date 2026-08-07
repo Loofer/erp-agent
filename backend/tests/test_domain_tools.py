@@ -45,14 +45,50 @@ def test_supplier_tool_exposes_a_parseable_payload_contract(client: object) -> N
 
     schema = supplier_tool.args_schema.model_json_schema()
 
-    assert set(schema["required"]) >= {
-        "supplierCode",
-        "name",
-        "contactPerson",
-        "phone",
-        "email",
-        "address",
-        "creditRating",
+    assert schema["required"] == ["supplier_payload"]
+
+
+def test_create_supplier_posts_normalized_payload() -> None:
+    requests: list[httpx.Request] = []
+    supplier = {
+        "id": 1,
+        "supplierCode": "SUP-001",
+        "name": "Acme Parts",
+        "contactPerson": "Jane Doe",
+        "phone": "13800138000",
+        "email": "jane@example.com",
+        "address": "Shanghai",
+        "creditRating": "A",
+        "status": 0,
+        "deleted": 0,
+        "createTime": None,
+        "updateTime": None,
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"code": 0, "data": supplier})
+
+    client = ApiClient(
+        "https://motorparts.test", transport=httpx.MockTransport(handler)
+    )
+    supplier_tool = build_supplier_tools(client)[0]
+
+    assert supplier_tool.invoke({"supplier_payload": supplier}) == {
+        "code": 0,
+        "data": supplier,
+    }
+    assert [(request.method, request.url.path) for request in requests] == [
+        ("POST", "/api/suppliers/create"),
+    ]
+    assert json.loads(requests[0].content) == {
+        "supplierCode": "SUP-001",
+        "name": "Acme Parts",
+        "contactPerson": "Jane Doe",
+        "phone": "13800138000",
+        "email": "jane@example.com",
+        "address": "Shanghai",
+        "creditRating": "A",
     }
 
 
@@ -264,13 +300,55 @@ def test_request_order_info_pauses_and_resumes_with_langgraph() -> None:
     assert resumed["result"]["human_response"] == "createdBy is 7"
 
 
-def test_request_supplier_info_returns_the_current_draft() -> None:
+def test_request_supplier_info_returns_complete_without_missing_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "agent.tools.hitl_tools.interrupt",
+        lambda value: pytest.fail("complete draft must not interrupt"),
+    )
     draft = {"supplierCode": "SUP-001", "name": "Acme"}
 
     assert request_supplier_info.invoke(
-        {"supplier_draft": draft, "missing_fields": ["phone", "address"]}
+        {"supplier_draft": draft, "missing_fields": []}
     ) == {
-        "status": "human_input_requested",
+        "status": "complete",
         "supplier_draft": draft,
-        "missing_fields": ["phone", "address"],
+        "missing_fields": [],
     }
+
+
+def test_request_supplier_info_forwards_agent_supplied_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    interrupts: list[dict[str, object]] = []
+
+    def fake_interrupt(value: dict[str, object]) -> str:
+        interrupts.append(value)
+        return "phone is 13800138000"
+
+    monkeypatch.setattr("agent.tools.hitl_tools.interrupt", fake_interrupt)
+
+    result = request_supplier_info.invoke(
+        {
+            "supplier_draft": {"supplierCode": "SUP-001", "name": "Acme"},
+            "missing_fields": ["phone"],
+            "message": "请补充供应商联系电话。",
+        }
+    )
+
+    assert result == {
+        "status": "human_input_received",
+        "supplier_draft": {"supplierCode": "SUP-001", "name": "Acme"},
+        "missing_fields": ["phone"],
+        "human_response": "phone is 13800138000",
+    }
+    assert interrupts == [
+        {
+            "kind": "tool_input",
+            "tool_name": "request_supplier_info",
+            "message": "请补充供应商联系电话。",
+            "supplier_draft": {"supplierCode": "SUP-001", "name": "Acme"},
+            "missing_fields": ["phone"],
+        }
+    ]

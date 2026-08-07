@@ -7,3 +7,5 @@ or grant API access by themselves.
 - `main/AGENTS.md`: global tool and approval rules.
 - `main/skill-management/SKILL.md`: extension process.
 - `procurement/procurement-analysis/SKILL.md`: current dashboard and BI flow.
+- `order/order-management/SKILL.md`: procurement-order creation and update flow.
+- `supplier/supplier-management/SKILL.md`: supplier lookup and creation flow.

@@ -8,10 +8,28 @@ from .http_base import ApiClient
 
 
 def _create_supplier_request(
-    client: ApiClient, payload: dict[str, Any]
+    client: ApiClient, supplier_payload: dict[str, Any]
 ) -> dict[str, object]:
     """Send the approved supplier creation request through the shared client."""
-    return client.post("/api/suppliers/create", dict(payload))
+    return client.post("/api/suppliers/create", supplier_payload)
+
+
+def _erp_supplier_payload(supplier_payload: dict[str, Any]) -> dict[str, Any]:
+    """Keep only API-writable supplier fields and omit absent optional values."""
+    writable_fields = (
+        "supplierCode",
+        "name",
+        "contactPerson",
+        "phone",
+        "email",
+        "address",
+        "creditRating",
+    )
+    return {
+        field: value
+        for field, value in supplier_payload.items()
+        if field in writable_fields and value not in (None, "")
+    }
 
 
 def _search_suppliers_request(client: ApiClient, name: str) -> dict[str, object]:
@@ -23,41 +41,18 @@ def build_supplier_tools(client: ApiClient) -> list[BaseTool]:
     """Build supplier-domain tools for one configured API client."""
 
     @tool(parse_docstring=True)
-    def create_supplier(
-        supplierCode: str,
-        name: str,
-        contactPerson: str,
-        phone: str,
-        email: str,
-        address: str,
-        creditRating: str,
-        status: int = 0,
-    ) -> dict[str, object]:
+    def create_supplier(supplier_payload: dict[str, Any]) -> dict[str, object]:
         """Create a supplier after Deep Agents' required human approval.
 
         Args:
-            supplierCode: Unique identifier code for the supplier.
-            name: Full company name of the supplier.
-            contactPerson: Name of the primary contact person.
-            phone: Contact phone number.
-            email: Contact email address.
-            address: Physical address of the supplier.
-            creditRating: Credit rating of the supplier (e.g. A, B, C).
-            status: Supplier status flag; 0 = active.
+            supplier_payload: Validated supplier data. It may include only
+                supplierCode, name, contactPerson, phone, email, address, and
+                creditRating. ERP-managed fields such as status are ignored.
 
         Returns:
             The API response for the approved supplier creation request.
         """
-        payload = {
-            "supplierCode": supplierCode,
-            "name": name,
-            "contactPerson": contactPerson,
-            "phone": phone,
-            "email": email,
-            "address": address,
-            "creditRating": creditRating,
-            "status": status,
-        }
+        payload = _erp_supplier_payload(supplier_payload)
         return _create_supplier_request(client, payload)
 
     @tool(parse_docstring=True)

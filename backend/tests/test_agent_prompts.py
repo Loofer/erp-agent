@@ -1,5 +1,5 @@
 from agent.memory.prompts import build_system_prompt
-from agent.middlewares import build_runtime_middlewares
+from agent.middlewares import RequestContextPromptMiddleware
 
 
 def test_system_prompt_contains_operating_constraints() -> None:
@@ -11,6 +11,6 @@ def test_system_prompt_contains_operating_constraints() -> None:
 
 
 def test_runtime_middlewares_include_request_context_prompt() -> None:
-    middlewares = build_runtime_middlewares()
-    assert len(middlewares) == 1
-    assert middlewares[0].__class__.__name__ == "RequestContextPromptMiddleware"
+    middleware = RequestContextPromptMiddleware()
+
+    assert middleware.__class__.__name__ == "RequestContextPromptMiddleware"

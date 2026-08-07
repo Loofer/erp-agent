@@ -1,6 +1,8 @@
 import pytest
 
-from agent.middlewares.rag_context import RequestContextPromptMiddleware
+from agent.middlewares.request_context_prompt_middleware import (
+    RequestContextPromptMiddleware,
+)
 
 
 def test_request_context_middleware_adds_identity_and_retrieval_context() -> None:

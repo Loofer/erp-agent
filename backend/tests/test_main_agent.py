@@ -26,8 +26,8 @@ def test_main_agent_uses_native_hitl_and_loaded_subagents(
     assert {tool.name for tool in captured["tools"]} == {"search_knowdge"}
     assert captured["subagents"] == []
     assert "interrupt_on" not in captured
-    assert captured["memory"] == ["/memory/AGENTS.md", "/memories/AGENTS.md"]
-    assert captured["skills"] == ["/skills/main/", "/skills/procurement/"]
+    assert captured["memory"] == ["/memory/AGENTS.md", "/memories/preferences.md"]
+    assert captured["skills"] == ["/skills/main/"]
     backend = captured["backend"]
     assert isinstance(backend, CompositeBackend)
     assert isinstance(backend.routes["/memories/"], StoreBackend)

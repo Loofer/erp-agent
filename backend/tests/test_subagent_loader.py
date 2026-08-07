@@ -57,7 +57,7 @@ def test_shipped_subagent_definitions_cover_research_analysis_and_order() -> Non
         ("procurement_order", ("request_order_info", "create_order", "update_order")),
         (
             "supplier_manager",
-            ("create_supplier", "search_suppliers", "request_supplier_info"),
+            ("request_supplier_info", "create_supplier", "search_suppliers"),
         ),
     ]
     order_definition = next(
@@ -68,6 +68,10 @@ def test_shipped_subagent_definitions_cover_research_analysis_and_order() -> Non
     )
     assert analyst_definition.skills == ("/skills/procurement/",)
     assert order_definition.skills == ("/skills/order/",)
+    supplier_definition = next(
+        definition for definition in definitions if definition.name == "supplier_manager"
+    )
+    assert supplier_definition.skills == ("/skills/supplier/",)
     assert order_definition.interrupt_on == {
         "create_order": {
             "allowed_decisions": ["approve", "reject"],
@@ -76,13 +80,7 @@ def test_shipped_subagent_definitions_cover_research_analysis_and_order() -> Non
             "allowed_decisions": ["approve", "reject"],
         },
     }
-    supplier_definition = next(
-        definition for definition in definitions if definition.name == "supplier_manager"
-    )
     assert supplier_definition.interrupt_on == {
-        "request_supplier_info": {
-            "allowed_decisions": ["respond"],
-        },
         "create_supplier": {"allowed_decisions": ["approve", "reject"]},
     }
 

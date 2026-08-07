@@ -47,21 +47,40 @@ def request_order_info(
 
 @tool(parse_docstring=True)
 def request_supplier_info(
-    supplier_draft: dict[str, Any], missing_fields: list[str]
+    supplier_draft: dict[str, Any], missing_fields: list[str], message: str = ""
 ) -> dict[str, object]:
-    """Request human completion of missing supplier data.
+    """Request human input for fields identified by the supplier-management skill.
 
     Args:
-        supplier_draft: Current supplier data, including fields that still need review.
-        missing_fields: Required supplier fields that need human confirmation.
+        supplier_draft: Current supplier draft to retain while awaiting input.
+        missing_fields: Field names the agent determined are missing or invalid.
+        message: User-facing question generated from the supplier-management skill.
 
     Returns:
-        The current supplier draft and its requested missing fields.
+        The complete draft without an interrupt, or the requested fields and the
+        user's free-text response.
     """
+    if not missing_fields:
+        return {
+            "status": "complete",
+            "supplier_draft": dict(supplier_draft),
+            "missing_fields": [],
+        }
+
+    human_response = interrupt(
+        {
+            "kind": "tool_input",
+            "tool_name": "request_supplier_info",
+            "message": message,
+            "supplier_draft": dict(supplier_draft),
+            "missing_fields": list(missing_fields),
+        }
+    )
     return {
-        "status": "human_input_requested",
+        "status": "human_input_received",
         "supplier_draft": dict(supplier_draft),
         "missing_fields": list(missing_fields),
+        "human_response": human_response,
     }
 
 
