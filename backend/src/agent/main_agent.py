@@ -69,7 +69,7 @@ def create_main_agent(
         subagents=deep_agent_subagents,
         skills=["/skills/main/"],
         memory=["/memory/AGENTS.md", "/memories/preferences.md"],
-        backend=build_agent_backend(sandbox_backend),
+        backend=build_agent_backend(sandbox_backend, store=store),
         debug=settings.debug,
         permissions=build_runtime_permissions(),
         checkpointer=checkpointer,

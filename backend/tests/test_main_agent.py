@@ -58,6 +58,9 @@ def test_main_agent_uses_supplied_persistence_dependencies(monkeypatch: Any) -> 
 
     assert captured["checkpointer"] is supplied_checkpointer
     assert captured["store"] is supplied_store
+    backend = captured["backend"]
+    assert isinstance(backend, CompositeBackend)
+    assert backend.routes["/memories/"]._store is supplied_store
 
 
 def test_main_agent_uses_supplied_sandbox_as_default_backend(
