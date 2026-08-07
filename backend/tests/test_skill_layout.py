@@ -12,4 +12,4 @@ def test_skill_documents_describe_current_tools_and_native_approval() -> None:
     assert analysis_guide.is_file()
     assert "create_supplier" in main_guide.read_text(encoding="utf-8")
     assert "human approval" in main_guide.read_text(encoding="utf-8")
-    assert "get_dashboard" in analysis_guide.read_text(encoding="utf-8")
+    assert "supplier_query" in analysis_guide.read_text(encoding="utf-8")

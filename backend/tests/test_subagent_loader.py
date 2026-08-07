@@ -43,7 +43,17 @@ def test_shipped_subagent_definitions_cover_research_analysis_and_order() -> Non
     definitions = load_subagent_definitions(directory)
 
     assert [(definition.name, definition.tools) for definition in definitions] == [
-        ("procurement_analyst", ("get_dashboard", "run_bi_text2sql")),
+        (
+            "procurement_analyst",
+            (
+                "supplier_query",
+                "part_query",
+                "part_search",
+                "part_by_supplier",
+                "order_search_details",
+                "inventory_warning",
+            ),
+        ),
         ("procurement_order", ("request_order_info", "create_order", "update_order")),
         (
             "supplier_manager",
@@ -53,6 +63,10 @@ def test_shipped_subagent_definitions_cover_research_analysis_and_order() -> Non
     order_definition = next(
         definition for definition in definitions if definition.name == "procurement_order"
     )
+    analyst_definition = next(
+        definition for definition in definitions if definition.name == "procurement_analyst"
+    )
+    assert analyst_definition.skills == ("/skills/procurement/",)
     assert order_definition.skills == ("/skills/order/",)
     assert order_definition.interrupt_on == {
         "request_order_info": {

@@ -6,10 +6,8 @@ from agent.tools import build_subagent_only_tools
 from agent.tools.customers_tools import build_customer_tools
 from agent.tools.hitl_tools import request_supplier_info
 from agent.tools.http_base import ApiClient
-from agent.tools.inventory_tools import build_inventory_tools
 from agent.tools.logistics_tools import build_logistics_tools
 from agent.tools.orders_tools import build_order_tools
-from agent.tools.parts_tools import build_part_tools
 from agent.tools.suppliers_tools import build_supplier_tools
 
 
@@ -21,16 +19,20 @@ def test_subagent_only_tools_are_not_registered_on_the_parent(
     assert [tool.name for tool in tools] == [
         "create_supplier",
         "search_suppliers",
+        "supplier_query",
+        "part_query",
+        "part_search",
+        "part_by_supplier",
+        "inventory_warning",
         "create_order",
         "update_order",
+        "order_search_details",
         "request_order_info",
         "request_supplier_info",
     ]
 
 
-def test_future_domain_modules_expose_no_tools_yet() -> None:
-    assert build_part_tools() == []
-    assert build_inventory_tools() == []
+def test_unimplemented_domain_modules_expose_no_tools_yet() -> None:
     assert build_logistics_tools() == []
     assert build_customer_tools() == []
 

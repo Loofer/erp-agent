@@ -68,8 +68,28 @@ def build_supplier_tools(client: ApiClient) -> list[BaseTool]:
             name: Full or partial supplier name to search for.
 
         Returns:
-            The API response containing matching supplier records.
+            ERP response wrapper with `code` (business status code), `message`
+            (status text), `timestamp` (response epoch milliseconds), and `data`.
+            `data` is a list of matching suppliers. Each supplier contains `id`,
+            `supplierCode`, `name`, `contactPerson`, `phone`, `email`, `address`,
+            `creditRating`, `status`, `deleted`, `createTime`, and `updateTime`.
         """
         return _search_suppliers_request(client, name)
 
-    return [create_supplier, search_suppliers]
+    @tool(parse_docstring=True)
+    def supplier_query(name: str) -> dict[str, object]:
+        """Find supplier records by full or partial name for procurement analysis.
+
+        Args:
+            name: Full or partial supplier name to search for.
+
+        Returns:
+            ERP response wrapper with `code` (business status code), `message`
+            (status text), `timestamp` (response epoch milliseconds), and `data`.
+            `data` is a list of matching suppliers. Each supplier contains `id`,
+            `supplierCode`, `name`, `contactPerson`, `phone`, `email`, `address`,
+            `creditRating`, `status`, `deleted`, `createTime`, and `updateTime`.
+        """
+        return _search_suppliers_request(client, name)
+
+    return [create_supplier, search_suppliers, supplier_query]
