@@ -242,4 +242,25 @@ def test_semantic_events_distinguish_routing_from_tool_calls() -> None:
     assert _semantic_message_events(task_result, "thread-1", [], {}) == []
     end_events = _semantic_message_events(tool_result, "thread-1", [], {})
     assert end_events[0]["event"] == "tool_call_end"
+
+
+def test_execute_result_emits_analysis_chart_and_report_events() -> None:
+    from api_view.chat_service import _semantic_message_events
+
+    stdout = (
+        'ANALYSIS_RESULT={"version":"1.0","status":"ok",'
+        '"summary":{"sample_size":1,"sources":["part_search"],'
+        '"metrics":[],"data_gaps":[]},"charts":[{'
+        '"id":"price","chart_type":"bar","title":"Price",'
+        '"x":"supplier","y":"value","data":[{"supplier":"A","value":1}]}'
+        '],"report_markdown":"# Report"}'
+    )
+    events = _semantic_message_events(
+        ToolMessage(content=stdout, name="execute", tool_call_id="call-execute", id="tool-execute"),
+        "thread-1", [], {},
+    )
+
+    assert [event["event"] for event in events] == ["tool_call_end", "analysis", "chart", "report"]
+    assert events[2]["data"]["chart"]["echarts"]["series"][0]["type"] == "bar"
+    assert events[3]["data"]["markdown"] == "# Report"
     assert end_events[0]["data"]["tool_call_id"] == "call-search"

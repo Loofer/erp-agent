@@ -121,10 +121,9 @@ async def get_thread_messages(
         thread_id: str,
         request: Request,
         service: ChatServiceDependency,
-) -> dict[str, list]:
+) -> dict[str, object]:
     """Return the stored human/AI messages for an existing thread."""
-    messages = await service.get_thread_messages(thread_id, request_user(request).user_id)
-    return {"messages": messages}
+    return await service.get_thread_messages(thread_id, request_user(request).user_id)
 
 
 # ---------------------------------------------------------------------------

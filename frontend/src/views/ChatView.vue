@@ -6,6 +6,8 @@ import { PlusOutlined, RobotOutlined, StopOutlined, ToolOutlined } from '@ant-de
 import { useChatStore } from '@/stores/chat'
 import MessageBubble from '@/components/MessageBubble.vue'
 import HitlApprovalBar from '@/components/HitlApprovalBar.vue'
+import ChartCard from '@/components/analysis/ChartCard.vue'
+import ReportMarkdown from '@/components/analysis/ReportMarkdown.vue'
 
 const store = useChatStore()
 const inputValue = ref('')
@@ -105,6 +107,23 @@ const conversationMenuConfig: ConversationsProps['menu'] = () => ({
             <MessageBubble :message="msg" />
           </div>
         </template>
+
+        <section v-if="store.analysisSummary" class="analysis-summary">
+          <div class="analysis-summary-header">
+            <strong>采购分析</strong><a-tag>{{ store.analysisSummary.status }}</a-tag>
+          </div>
+          <div class="analysis-metrics">
+            <span>样本数：{{ store.analysisSummary.sample_size }}</span>
+            <span v-for="metric in store.analysisSummary.metrics" :key="metric.name">
+              {{ metric.name }}：{{ metric.value }}{{ metric.unit ? ` ${metric.unit}` : '' }}
+            </span>
+          </div>
+          <a-alert v-if="store.analysisSummary.data_gaps.length || store.analysisSummary.error" type="warning" show-icon>
+            {{ store.analysisSummary.error || store.analysisSummary.data_gaps.join('；') }}
+          </a-alert>
+        </section>
+        <ChartCard v-for="chart in store.charts" :key="chart.spec?.id || chart.reason" :chart="chart" />
+        <ReportMarkdown v-if="store.report" :markdown="store.report" />
 
         <div ref="messagesEndRef" />
       </div>
@@ -237,6 +256,10 @@ const conversationMenuConfig: ConversationsProps['menu'] = () => ({
   border-top: 1px solid #f0f0f0;
   flex-shrink: 0;
 }
+
+.analysis-summary { width: min(760px, 100%); padding: 12px 0; }
+.analysis-summary-header, .analysis-metrics { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.analysis-metrics { margin: 8px 0; color: #595959; font-size: 12px; }
 
 .sender-toolbar {
   display: flex;

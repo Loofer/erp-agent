@@ -11,9 +11,12 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AAlert: typeof import('ant-design-vue/es')['Alert']
     AButton: typeof import('ant-design-vue/es')['Button']
+    AEmpty: typeof import('ant-design-vue/es')['Empty']
     AgentNodeCards: typeof import('./components/AgentNodeCards.vue')['default']
     ASwitch: typeof import('ant-design-vue/es')['Switch']
+    ATag: typeof import('ant-design-vue/es')['Tag']
     ChartCard: typeof import('./components/analysis/ChartCard.vue')['default']
     HelloWorld: typeof import('./components/HelloWorld.vue')['default']
     HitlApprovalBar: typeof import('./components/HitlApprovalBar.vue')['default']

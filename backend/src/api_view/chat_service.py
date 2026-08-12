@@ -13,6 +13,8 @@ from langgraph.types import Command
 from agent.rag.hybrid_retriever import HybridRetriever, render_retrieval_context
 
 from .chat_persistence import ConversationRepository, ThreadInfo
+from visualization import build_chart_payload, parse_analysis_result
+from visualization.schema import AnalysisResultError
 
 setup_logging()
 _log = logging.getLogger(__name__)
@@ -108,6 +110,7 @@ class ChatService:
         # than once.  Emit each one only on its first (innermost) sighting.
         seen_interrupts: set[str] = set()
         emitted_tool_calls: set[str] = set()
+        emitted_artifacts: set[str] = set()
         try:
             graph = self._get_graph()
             async for chunk in graph.astream(
@@ -121,7 +124,9 @@ class ChatService:
                 # With version="v2" every chunk is a single dict shaped
                 # {"type", "ns", "data", ...} — subgraphs=True puts the
                 # namespace under "ns" rather than wrapping in a tuple.
-                logging.debug("[chat_service] threadId: %s Graph chunk: %r",thread_id, chunk)
+
+                # logging.debug("[chat_service] threadId: %s Graph chunk: %r",thread_id, chunk)
+
                 chunk_type = chunk.get("type")
                 ns_list = list(chunk.get("ns") or ())
                 if chunk_type == "values":
@@ -169,12 +174,28 @@ class ChatService:
                         ns_list,
                         meta,
                     ):
+                        artifacts = event.pop("artifacts", [])
                         yield self._event(**event)
+                        for artifact in artifacts:
+                            artifact_type = artifact["type"]
+                            artifact_key = artifact["key"]
+                            marker = f"{artifact_type}:{artifact_key}"
+                            if marker in emitted_artifacts:
+                                continue
+                            emitted_artifacts.add(marker)
+                            if self._conversations is not None:
+                                try:
+                                    await self._conversations.save_artifact(
+                                        thread_id, user_id, self._agent_id,
+                                        artifact_type, artifact_key, artifact["payload"],
+                                    )
+                                except Exception:  # noqa: BLE001
+                                    _log.exception("Failed to persist chat artifact")
         except Exception:  # noqa: BLE001
             # 生产禁止直接repr(exc)对外暴露堆栈！
             _log.exception("Agent run failed for thread %s", thread_id)
             yield self._event(
-                "error", thread_id, data={"message": "Agent run exception"}
+                "error", thread_id, data={"message": "Agent run exception, try again later"}
             )
             return
 
@@ -187,7 +208,7 @@ class ChatService:
 
     async def get_thread_messages(
         self, thread_id: str, user_id: str
-    ) -> list[dict[str, object]]:
+    ) -> dict[str, object]:
         """Return a flat, user-visible timeline from the checkpoint state.
 
         ``messages`` is the durable LangGraph state.  Keeping the projection
@@ -205,9 +226,15 @@ class ChatService:
         graph = self._get_graph()
         state = await graph.aget_state(config)
         if state is None or not state.values:
-            return []
+            return {"messages": [], "artifacts": []}
         raw_messages = state.values.get("messages", [])
-        return _serialize_timeline(raw_messages)
+        artifacts = []
+        if self._conversations is not None:
+            try:
+                artifacts = await self._conversations.list_artifacts(thread_id, user_id)
+            except Exception:  # noqa: BLE001
+                _log.exception("Failed to load chat artifacts")
+        return {"messages": _serialize_timeline(raw_messages), "artifacts": artifacts}
 
     def _get_graph(self) -> Any:
         if self._graph is None:
@@ -296,7 +323,7 @@ def _semantic_message_events(
         # A task result is an internal summary passed back to the parent agent.
         if tool_name == "task":
             return []
-        return [
+        events = [
             {
                 "event": "tool_call_end",
                 "thread_id": thread_id,
@@ -313,6 +340,46 @@ def _semantic_message_events(
                 "raw_message": message,
             }
         ]
+        if tool_name == "execute":
+            result_text = _content_text(data.get("content"))
+            try:
+                analysis = parse_analysis_result(result_text)
+            except AnalysisResultError as error:
+                events.append({
+                    "event": "analysis",
+                    "thread_id": thread_id,
+                    "namespace": namespace,
+                    "agent_name": agent_name,
+                    "message_id": message_id,
+                    "meta": meta,
+                    "data": {"status": "error", "error": str(error), "sample_size": 0, "sources": [], "metrics": [], "data_gaps": [str(error)]},
+                    "raw_message": message,
+                    "artifacts": [{"type": "analysis", "key": message_id or "latest", "payload": {"status": "error", "error": str(error), "sample_size": 0, "sources": [], "metrics": [], "data_gaps": [str(error)]}}],
+                })
+            else:
+                summary = analysis.summary.model_dump(mode="json")
+                events.append({
+                    "event": "analysis", "thread_id": thread_id, "namespace": namespace,
+                    "agent_name": agent_name, "message_id": message_id, "meta": meta,
+                    "data": {"status": analysis.status, **summary}, "raw_message": message,
+                    "artifacts": [{"type": "analysis", "key": message_id or "latest", "payload": {"status": analysis.status, **summary}}],
+                })
+                for chart in analysis.charts:
+                    payload = build_chart_payload(chart)
+                    events.append({
+                        "event": "chart", "thread_id": thread_id, "namespace": namespace,
+                        "agent_name": agent_name, "message_id": message_id, "meta": meta,
+                        "data": {"chart_id": chart.id, "chart": payload}, "raw_message": message,
+                        "artifacts": [{"type": "chart", "key": chart.id, "payload": payload}],
+                    })
+                if analysis.report_markdown:
+                    events.append({
+                        "event": "report", "thread_id": thread_id, "namespace": namespace,
+                        "agent_name": agent_name, "message_id": message_id, "meta": meta,
+                        "data": {"markdown": analysis.report_markdown}, "raw_message": message,
+                        "artifacts": [{"type": "report", "key": message_id or "latest", "payload": {"markdown": analysis.report_markdown}}],
+                    })
+        return events
     # HumanMessage has no user-visible streaming projection. It is retained in
     # checkpoint history and is handled by the HTTP history serializer.
     if isinstance(message, HumanMessage) or _is_test_message(data, "human"):
