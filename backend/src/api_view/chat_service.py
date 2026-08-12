@@ -1,11 +1,13 @@
 """Graph streaming orchestration for the chat transport."""
 import asyncio
 import logging
+import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from typing import Any
 
 from backend.logs.logging_config import setup_logging
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.types import Command
 
 from agent.rag.hybrid_retriever import HybridRetriever, render_retrieval_context
@@ -38,12 +40,14 @@ class ChatService:
         graph_factory: Callable[[], Any] | None = None,
         agent_id: str = "motorparts-agent",
         rag_retriever: HybridRetriever | None = None,
+        debug: bool = False,
     ) -> None:
         self._graph = graph
         self._graph_factory = graph_factory
         self._conversations = conversations
         self._agent_id = agent_id
         self._rag_retriever = rag_retriever
+        self._debug = debug
 
     async def stream(
         self,
@@ -90,7 +94,7 @@ class ChatService:
             except Exception:  # noqa: BLE001
                 _log.exception("RAG retrieval failed for thread %s", thread_id)
 
-        yield {"event": "conversation", "data": {"thread_id": thread_id}}
+        yield self._event("conversation", thread_id, data={})
 
         graph_input: object = (
             Command(resume=resume_data)
@@ -103,6 +107,7 @@ class ChatService:
         # namespace as the graph unwinds, so the same Interrupt.id arrives more
         # than once.  Emit each one only on its first (innermost) sighting.
         seen_interrupts: set[str] = set()
+        emitted_tool_calls: set[str] = set()
         try:
             graph = self._get_graph()
             async for chunk in graph.astream(
@@ -130,21 +135,24 @@ class ChatService:
                                 continue
                             seen_interrupts.add(interrupt_id)
                         interrupted = True
-                        yield {
-                            "event": "interrupt",
-                            "namespace": ns_list,
-                            "data": _interrupt_data(item, thread_id, ns_list),
-                        }
+                        yield self._event(
+                            "interrupt",
+                            thread_id,
+                            namespace=ns_list,
+                            data=_interrupt_data(item, thread_id, ns_list),
+                        )
                     if interrupts:
                         # Keep draining: LangGraph must finish unwinding for the
                         # checkpoint to record the pending interrupt.  Breaking
                         # early loses it and the resume replays the node instead.
                         continue
-                    yield {
-                        "event": "graph_state",
-                        "namespace": ns_list,
-                        "data": _state_data(graph_state),
-                    }
+                    for event in _semantic_calls_from_state(
+                        graph_state,
+                        thread_id,
+                        ns_list,
+                        emitted_tool_calls,
+                    ):
+                        yield self._event(**event)
                 elif chunk_type == "messages":
                     # v2 "messages" payload is one (message_chunk, metadata)
                     # tuple — not a list of them.  Iterating it yields the
@@ -154,25 +162,24 @@ class ChatService:
                         graph_message, msg_meta = payload
                     else:
                         graph_message, msg_meta = payload, {}
-                    yield {
-                        "event": "message_chunk",
-                        "namespace": ns_list,
-                        "meta": _message_meta(msg_meta),
-                        "data": _message_data(graph_message, thread_id),
-                    }
+                    meta = _message_meta(msg_meta)
+                    for event in _semantic_message_events(
+                        graph_message,
+                        thread_id,
+                        ns_list,
+                        meta,
+                    ):
+                        yield self._event(**event)
         except Exception:  # noqa: BLE001
             # 生产禁止直接repr(exc)对外暴露堆栈！
             _log.exception("Agent run failed for thread %s", thread_id)
-            yield {
-                "event": "error",
-                "namespace": [],
-                "meta": {},
-                "data": {"thread_id": thread_id, "message": "Agent run exception"},
-            }
+            yield self._event(
+                "error", thread_id, data={"message": "Agent run exception"}
+            )
             return
 
         if not interrupted:
-            yield {"event": "complete", "namespace": [], "data": {"thread_id": thread_id}}
+            yield self._event("complete", thread_id, data={})
 
     async def list_threads(self, user_id: str) -> list[ThreadInfo]:
         """List the active agent's conversation threads for one user."""
@@ -209,6 +216,39 @@ class ChatService:
             self._graph = self._graph_factory()
         return self._graph
 
+    def _event(
+        self,
+        event: str,
+        thread_id: str,
+        *,
+        namespace: list[str] | None = None,
+        agent_name: str | None = None,
+        message_id: str | None = None,
+        meta: dict[str, object] | None = None,
+        data: dict[str, object],
+        raw_message: object | None = None,
+    ) -> dict[str, object]:
+        """Build one stable, frontend-facing event envelope."""
+        meta = meta or {}
+        payload: dict[str, object] = {
+            "event": event,
+            "event_id": f"evt_{uuid.uuid4().hex}",
+            "thread_id": thread_id,
+            "namespace": namespace or [],
+            "agent_name": agent_name or meta.get("lc_agent_name"),
+            "message_id": message_id,
+            "langgraph_node": meta.get("langgraph_node"),
+            "langgraph_step": meta.get("langgraph_step"),
+            "checkpoint_ns": meta.get("checkpoint_ns"),
+            "data": data,
+        }
+        if self._debug:
+            payload["debug"] = {
+                "raw_metadata": meta,
+                "raw_message": _debug_value(raw_message),
+            }
+        return {key: value for key, value in payload.items() if value is not None}
+
 
 def _message_data(message: object, thread_id: str) -> object:
     model_dump = getattr(message, "model_dump", None)
@@ -216,6 +256,157 @@ def _message_data(message: object, thread_id: str) -> object:
     if isinstance(data, dict):
         return {**data, "thread_id": thread_id}
     return {"thread_id": thread_id, "message": data}
+
+
+def _semantic_message_events(
+    message: object,
+    thread_id: str,
+    namespace: list[str],
+    meta: dict[str, object],
+) -> list[dict[str, object]]:
+    """Project one streamed LangChain message into user-facing event types.
+
+    Tool starts are emitted from completed state snapshots because streamed tool
+    chunks often contain only partial JSON. Tool results, by contrast, arrive
+    as complete ToolMessages and can be emitted immediately.
+    """
+    data = _message_dict(message)
+    message_id = _string(data.get("id"))
+    agent_name = _string(data.get("name")) or _string(meta.get("lc_agent_name"))
+
+    if isinstance(message, AIMessage) or _is_test_message(data, "ai"):
+        content = _content_text(data.get("content"))
+        if content:
+            return [
+                {
+                    "event": "message_chunk",
+                    "thread_id": thread_id,
+                    "namespace": namespace,
+                    "agent_name": agent_name,
+                    "message_id": message_id,
+                    "meta": meta,
+                    "data": {"content": content},
+                    "raw_message": message,
+                }
+            ]
+        return []
+
+    if isinstance(message, ToolMessage) or _is_test_message(data, "tool"):
+        tool_name = _string(data.get("name"))
+        # A task result is an internal summary passed back to the parent agent.
+        if tool_name == "task":
+            return []
+        return [
+            {
+                "event": "tool_call_end",
+                "thread_id": thread_id,
+                "namespace": namespace,
+                "agent_name": agent_name,
+                "message_id": message_id,
+                "meta": meta,
+                "data": {
+                    "tool_call_id": _string(data.get("tool_call_id")),
+                    "tool_name": tool_name or "tool",
+                    "result": _content_text(data.get("content")),
+                    "tool_status": _string(data.get("status")),
+                },
+                "raw_message": message,
+            }
+        ]
+    # HumanMessage has no user-visible streaming projection. It is retained in
+    # checkpoint history and is handled by the HTTP history serializer.
+    if isinstance(message, HumanMessage) or _is_test_message(data, "human"):
+        return []
+    return []
+
+
+def _semantic_calls_from_state(
+    state: object,
+    thread_id: str,
+    namespace: list[str],
+    emitted_tool_calls: set[str],
+) -> list[dict[str, object]]:
+    """Emit one complete start or routing event for each newly seen tool call."""
+    if not isinstance(state, dict):
+        return []
+    messages = state.get("messages")
+    if not isinstance(messages, list):
+        return []
+
+    events: list[dict[str, object]] = []
+    for message in messages:
+
+        message_data = _message_dict(message)
+        if not isinstance(message, AIMessage) and not _is_test_message(message_data, "ai"):
+            continue
+        message_id = _string(message_data.get("id"))
+        agent_name = _string(message_data.get("name"))
+        for index, call in enumerate(message_data.get("tool_calls") or []):
+            if not isinstance(call, dict):
+                continue
+            tool_call_id = _string(call.get("id"))
+            tool_name = _string(call.get("name"))
+            if not tool_call_id or not tool_name or tool_call_id in emitted_tool_calls:
+                continue
+            emitted_tool_calls.add(tool_call_id)
+            args = call.get("args") if isinstance(call.get("args"), dict) else {}
+            base = {
+                "thread_id": thread_id,
+                "namespace": namespace,
+                "agent_name": agent_name,
+                "message_id": message_id,
+                "meta": {},
+                "raw_message": message,
+            }
+            if tool_name == "task":
+                events.append(
+                    {
+                        **base,
+                        "event": "agent_routing",
+                        "data": {
+                            "tool_call_id": tool_call_id,
+                            "tool_call_index": index,
+                            "subagent_type": _string(args.get("subagent_type")),
+                            "description": _string(args.get("description")),
+                        },
+                    }
+                )
+            else:
+                events.append(
+                    {
+                        **base,
+                        "event": "tool_call_start",
+                        "data": {
+                            "tool_call_id": tool_call_id,
+                            "tool_call_index": index,
+                            "tool_name": tool_name,
+                            "args": args,
+                        },
+                    }
+                )
+    return events
+
+
+def _message_dict(message: object) -> dict[str, object]:
+    model_dump = getattr(message, "model_dump", None)
+    data = model_dump() if callable(model_dump) else message
+    return data if isinstance(data, dict) else {}
+
+
+def _is_test_message(data: dict[str, object], message_type: str) -> bool:
+    """Accept the dict-shaped fake messages used by focused service tests."""
+    return data.get("type") == message_type
+
+
+def _string(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+def _debug_value(value: object | None) -> object | None:
+    if value is None:
+        return None
+    model_dump = getattr(value, "model_dump", None)
+    return model_dump() if callable(model_dump) else value
 
 
 # Only the metadata the UI needs.  The raw dict also carries lc_versions,
@@ -361,6 +552,25 @@ def _serialize_timeline(messages: object) -> list[dict[str, object]]:
                 if not isinstance(call, dict):
                     continue
                 tool_call_id = str(call.get("id") or f"{message_id}:{position}")
+                tool_name = str(call.get("name") or "tool")
+                args = call.get("args") or {}
+                if tool_name == "task":
+                    timeline.append(
+                        {
+                            "id": f"routing:{tool_call_id}",
+                            "kind": "agent_routing",
+                            "content": "",
+                            "actor_name": data.get("name"),
+                            "tool_call_id": tool_call_id,
+                            "subagent_type": args.get("subagent_type")
+                            if isinstance(args, dict)
+                            else None,
+                            "description": args.get("description")
+                            if isinstance(args, dict)
+                            else None,
+                        }
+                    )
+                    continue
                 tool_call_positions[tool_call_id] = len(timeline)
                 timeline.append(
                     {
@@ -369,15 +579,17 @@ def _serialize_timeline(messages: object) -> list[dict[str, object]]:
                         "content": "",
                         "actor_name": data.get("name"),
                         "tool_call_id": tool_call_id,
-                        "tool_name": str(call.get("name") or "tool"),
-                        "tool_args": call.get("args") or {},
-                        "status": "running",
+                        "tool_name": tool_name,
+                        "tool_args": args,
                     }
                 )
             continue
 
         if msg_type == "tool":
             tool_call_id = str(data.get("tool_call_id") or message_id)
+            tool_name = str(data.get("name") or "tool")
+            if tool_name == "task":
+                continue
             status = "error" if data.get("status") == "error" else "success"
             call_position = tool_call_positions.get(tool_call_id)
             if call_position is not None:
@@ -389,7 +601,7 @@ def _serialize_timeline(messages: object) -> list[dict[str, object]]:
                     "content": _content_text(data.get("content", "")),
                     "actor_name": data.get("name"),
                     "tool_call_id": tool_call_id,
-                    "tool_name": data.get("name"),
+                    "tool_name": tool_name,
                     "status": status,
                 }
             )

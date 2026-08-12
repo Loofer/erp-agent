@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { computed, h } from 'vue'
 import {
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  LoadingOutlined,
+  ApartmentOutlined,
   RobotOutlined,
   ToolOutlined,
   UserOutlined,
@@ -40,18 +38,6 @@ const avatar = computed(() =>
     : { icon: h(RobotOutlined), style: { background: '#1677ff' } },
 )
 
-const toolStatus = computed(() => {
-  if (props.message.status === 'error') return 'Failed'
-  if (props.message.status === 'success') return 'Completed'
-  return 'Running'
-})
-
-const toolIcon = computed(() => {
-  if (props.message.status === 'error') return CloseCircleOutlined
-  if (props.message.status === 'success') return CheckCircleOutlined
-  return LoadingOutlined
-})
-
 const formattedArgs = computed(() => {
   if (!props.message.toolArgs || Object.keys(props.message.toolArgs).length === 0) return ''
   try {
@@ -63,28 +49,37 @@ const formattedArgs = computed(() => {
 </script>
 
 <template>
-  <div v-if="message.kind === 'tool_call'" class="tool-message tool-call-message">
+  <div v-if="message.kind === 'agent_routing'" class="tool-message routing-message">
+    <div class="tool-title"><ApartmentOutlined /><strong>Agent Routing</strong></div>
+    <dl class="tool-details">
+      <template v-if="message.actorName"><dt>Agent Name</dt><dd>{{ message.actorName }}</dd></template>
+      <template v-if="message.targetAgent"><dt>Target Agent</dt><dd><code>{{ message.targetAgent }}</code></dd></template>
+      <template v-if="message.description"><dt>Description</dt><dd><pre class="tool-payload">{{ message.description }}</pre></dd></template>
+    </dl>
+  </div>
+
+  <div v-else-if="message.kind === 'tool_call'" class="tool-message tool-call-message">
     <div class="tool-title">
       <ToolOutlined />
-      <code>{{ message.toolName || 'tool' }}</code>
-      <span class="tool-status" :class="message.status">
-        <component :is="toolIcon" />
-        {{ toolStatus }}
-      </span>
+      <strong>Tool Call Start</strong>
     </div>
-    <span v-if="message.actorName" class="actor-name">{{ message.actorName }}</span>
-    <pre v-if="formattedArgs" class="tool-payload">{{ formattedArgs }}</pre>
+    <dl class="tool-details">
+      <template v-if="message.actorName"><dt>Agent Name</dt><dd>{{ message.actorName }}</dd></template>
+      <dt>Tool Name</dt><dd><code>{{ message.toolName || 'tool' }}</code></dd>
+      <template v-if="formattedArgs"><dt>Args</dt><dd><pre class="tool-payload">{{ formattedArgs }}</pre></dd></template>
+    </dl>
   </div>
 
   <div v-else-if="message.kind === 'tool_result'" class="tool-message tool-result-message">
     <div class="tool-title">
       <ToolOutlined />
-      <span>{{ message.toolName || 'Tool result' }}</span>
-      <span class="tool-status" :class="message.status">
-        {{ message.status === 'error' ? 'Failed' : 'Completed' }}
-      </span>
+      <strong>Tool Call End</strong>
     </div>
-    <pre class="tool-payload">{{ message.content }}</pre>
+    <dl class="tool-details">
+      <template v-if="message.actorName"><dt>Agent Name</dt><dd>{{ message.actorName }}</dd></template>
+      <dt>Tool Name</dt><dd><code>{{ message.toolName || 'tool' }}</code></dd>
+      <dt>Result</dt><dd><pre class="tool-payload result-payload">{{ message.content }}</pre></dd>
+    </dl>
   </div>
 
   <Bubble
@@ -118,8 +113,12 @@ const formattedArgs = computed(() => {
 }
 
 .tool-result-message {
-  border-color: #b7eb8f;
-  background: #fcfff5;
+  border-color: #d9d9d9;
+}
+
+.routing-message {
+  border-color: #91caff;
+  background: #f5faff;
 }
 
 .tool-title {
@@ -131,23 +130,10 @@ const formattedArgs = computed(() => {
   font-size: 13px;
 }
 
-.tool-title code {
+.tool-title code, .tool-title strong {
   color: #262626;
   font-size: 12px;
 }
-
-.tool-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  color: #1677ff;
-  font-size: 12px;
-}
-
-.tool-status.success { color: #389e0d; }
-.tool-status.error { color: #cf1322; }
-.tool-status.running :deep(.anticon) { animation: spin 1s linear infinite; }
 
 .actor-name {
   display: inline-block;
@@ -156,8 +142,19 @@ const formattedArgs = computed(() => {
   font-size: 11px;
 }
 
+.tool-details {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 7px 10px;
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+.tool-details dt { color: #8c8c8c; }
+.tool-details dd { min-width: 0; margin: 0; color: #434343; }
+
 .tool-payload {
-  max-height: 240px;
+  max-height: 360px;
   overflow: auto;
   margin: 8px 0 0;
   padding: 8px;
@@ -200,5 +197,7 @@ const formattedArgs = computed(() => {
   color: #595959;
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 720px) {
+  .tool-details { grid-template-columns: 1fr; gap: 3px; }
+}
 </style>

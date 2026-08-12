@@ -135,18 +135,10 @@ async def get_thread_messages(
 async def _encode_sse_events(
         events: AsyncIterator[dict[str, object]],
 ) -> AsyncIterator[ServerSentEvent]:
-    """Encode service events as SSE, folding namespace/meta into the JSON body.
-
-    SSE frames carry a single `data` field, so `namespace` and `meta` travel
-    inside the payload rather than as sibling frame fields. `namespace` tells
-    the client which (sub)agent produced the event: `[]` is the main agent.
-    """
+    """Encode semantic service events as SSE JSON payloads."""
     async for event in events:
-        payload = {
-            "namespace": event.get("namespace", []),
-            "meta": event.get("meta", {}),
-            **_as_dict(event.get("data")),
-        }
+        payload = {key: value for key, value in event.items() if key != "event"}
+        payload["data"] = _as_dict(payload.get("data"))
         yield ServerSentEvent(
             event=str(event["event"]),
             data=json.dumps(payload, ensure_ascii=False, default=str),

@@ -69,6 +69,7 @@ async def lifespan(app: FastAPI):
                 conversations,
                 agent_id=settings.agent_id,
                 rag_retriever=rag_retriever,
+                debug=settings.debug,
             )
             yield
 

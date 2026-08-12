@@ -61,11 +61,11 @@ async def test_resume_stream_uses_command_and_thread_configuration() -> None:
         "current_time": graph.context["current_time"],
         "retrieval_context": "",
     }
-    assert events[-1] == {
-        "event": "complete",
-        "namespace": [],
-        "data": {"thread_id": "thread-1"},
-    }
+    assert events[-1]["event"] == "complete"
+    assert events[-1]["thread_id"] == "thread-1"
+    assert events[-1]["namespace"] == []
+    assert events[-1]["data"] == {}
+    assert events[-1]["event_id"].startswith("evt_")
 
 
 @pytest.mark.anyio
@@ -149,10 +149,10 @@ async def test_stream_preserves_parent_and_subagent_identity() -> None:
     chunks = [event for event in events if event["event"] == "message_chunk"]
 
     assert chunks[0]["namespace"] == ["tools:subagent-run"]
-    assert chunks[0]["meta"]["lc_agent_name"] == "supplier_manager"
+    assert chunks[0]["agent_name"] == "supplier_manager"
     assert chunks[0]["data"]["content"] == "internal result"
     assert chunks[1]["namespace"] == []
-    assert chunks[1]["meta"]["lc_agent_name"] == "erp-agent"
+    assert chunks[1]["agent_name"] == "erp-agent"
     assert chunks[1]["data"]["content"] == "final answer"
 
 
@@ -183,14 +183,63 @@ def test_checkpoint_messages_become_a_flat_timeline_with_tool_results() -> None:
         ]
     )
 
-    assert [item["kind"] for item in timeline] == [
-        "user",
-        "tool_call",
-        "tool_result",
-        "assistant",
-    ]
+    assert [item["kind"] for item in timeline] == ["user", "tool_call", "tool_result", "assistant"]
     assert timeline[1]["tool_name"] == "order_search_details"
     assert timeline[1]["tool_args"] == {"partName": "brake pad"}
     assert timeline[1]["status"] == "success"
     assert timeline[2]["tool_call_id"] == "call-1"
     assert timeline[2]["content"] == '{"orders": 3}'
+
+
+def test_semantic_events_distinguish_routing_from_tool_calls() -> None:
+    from api_view.chat_service import _semantic_calls_from_state, _semantic_message_events
+
+    task = AIMessage(
+        content="",
+        id="ai-routing",
+        name="erp-agent",
+        tool_calls=[
+            {
+                "id": "call-task",
+                "name": "task",
+                "args": {
+                    "subagent_type": "procurement_analyst",
+                    "description": "Find the requested part.",
+                },
+            }
+        ],
+    )
+    tool = AIMessage(
+        content="",
+        id="ai-tool",
+        name="procurement_analyst",
+        tool_calls=[
+            {
+                "id": "call-search",
+                "name": "part_search",
+                "args": {"keyword": "FR7DC+"},
+            }
+        ],
+    )
+    events = _semantic_calls_from_state(
+        {"messages": [task, tool]}, "thread-1", ["tools:subagent"], set()
+    )
+
+    assert [event["event"] for event in events] == [
+        "agent_routing",
+        "tool_call_start",
+    ]
+    assert events[0]["data"] == {
+        "tool_call_id": "call-task",
+        "tool_call_index": 0,
+        "subagent_type": "procurement_analyst",
+        "description": "Find the requested part.",
+    }
+    assert events[1]["data"]["args"] == {"keyword": "FR7DC+"}
+
+    task_result = ToolMessage("internal summary", name="task", tool_call_id="call-task")
+    tool_result = ToolMessage('{"items": []}', name="part_search", tool_call_id="call-search")
+    assert _semantic_message_events(task_result, "thread-1", [], {}) == []
+    end_events = _semantic_message_events(tool_result, "thread-1", [], {})
+    assert end_events[0]["event"] == "tool_call_end"
+    assert end_events[0]["data"]["tool_call_id"] == "call-search"

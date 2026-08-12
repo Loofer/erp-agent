@@ -20,13 +20,17 @@ function authHeaders(): HeadersInit {
 
 export interface ChatMessage {
   id: string
-  kind: 'user' | 'assistant' | 'tool_call' | 'tool_result'
+  kind: 'user' | 'assistant' | 'agent_routing' | 'tool_call' | 'tool_result'
   role?: 'user' | 'assistant'
   content: string
   actorName?: string
   toolCallId?: string
   toolName?: string
   toolArgs?: Record<string, unknown>
+  targetAgent?: string
+  description?: string
+  namespace?: string[]
+  eventData?: Record<string, unknown>
   status?: 'running' | 'success' | 'error'
   loading?: boolean
   interrupted?: InterruptData
@@ -84,10 +88,9 @@ export async function fetchThreadMessages(threadId: string): Promise<ChatMessage
     const data: { messages: Array<Record<string, unknown>> } = await res.json()
     return (data.messages ?? []).map((m) => ({
       id: typeof m.id === 'string' && m.id ? m.id : crypto.randomUUID(),
-      kind:
-        m.kind === 'tool_call' || m.kind === 'tool_result' || m.kind === 'user'
-          ? m.kind
-          : 'assistant',
+      kind: ['agent_routing', 'tool_call', 'tool_result', 'user'].includes(String(m.kind))
+        ? (m.kind as ChatMessage['kind'])
+        : 'assistant',
       role: m.role === 'user' ? 'user' : m.role === 'assistant' ? 'assistant' : undefined,
       content: typeof m.content === 'string' ? m.content : '',
       actorName: typeof m.actor_name === 'string' ? m.actor_name : undefined,
@@ -97,6 +100,8 @@ export async function fetchThreadMessages(threadId: string): Promise<ChatMessage
         m.tool_args && typeof m.tool_args === 'object'
           ? (m.tool_args as Record<string, unknown>)
           : undefined,
+      targetAgent: typeof m.subagent_type === 'string' ? m.subagent_type : undefined,
+      description: typeof m.description === 'string' ? m.description : undefined,
       status:
         m.status === 'running' || m.status === 'success' || m.status === 'error'
           ? m.status
@@ -145,6 +150,24 @@ export interface ToolCallStart {
   name: string
   args: Record<string, unknown>
   agentName?: string
+  namespace?: string[]
+  eventData?: Record<string, unknown>
+}
+
+/** Structured chart payload used by the optional analysis renderer. */
+export interface ChartPayload {
+  spec: {
+    id?: string
+    title?: string
+    subtitle?: string
+    chart_type?: string
+    chartable?: boolean
+    data?: Array<Record<string, unknown>>
+    provenance?: string[]
+    warnings?: string[]
+  } | null
+  echarts: Record<string, unknown> | null
+  reason?: string
 }
 
 export interface StreamCallbacks {
@@ -153,6 +176,15 @@ export interface StreamCallbacks {
   onChunk: (chunk: string, messageId: string, agentName?: string) => void
   /** AI 决定调用工具 */
   onToolCallStart: (calls: ToolCallStart[]) => void
+  onAgentRouting: (routing: {
+    id: string
+    toolCallId: string
+    agentName?: string
+    targetAgent?: string
+    description?: string
+    namespace?: string[]
+    eventData?: Record<string, unknown>
+  }) => void
   /** 工具执行完毕，返回结果 */
   onToolResult: (result: {
     id: string
@@ -160,6 +192,9 @@ export interface StreamCallbacks {
     content: string
     toolName?: string
     isError: boolean
+    agentName?: string
+    namespace?: string[]
+    eventData?: Record<string, unknown>
   }) => void
   onInterrupt: (data: InterruptData) => void
   onDone: () => void
@@ -271,11 +306,20 @@ async function _consumeSseStream(
   }
 }
 
-function _agentNameOf(parsed: Record<string, unknown>): string | undefined {
-  const meta = parsed.meta
-  if (!meta || typeof meta !== 'object') return undefined
-  const name = (meta as Record<string, unknown>).lc_agent_name
-  return typeof name === 'string' ? name : undefined
+function _string(value: unknown): string | undefined {
+  return typeof value === 'string' && value ? value : undefined
+}
+
+function _namespaceOf(parsed: Record<string, unknown>): string[] | undefined {
+  return Array.isArray(parsed.namespace)
+    ? parsed.namespace.filter((value): value is string => typeof value === 'string')
+    : undefined
+}
+
+function _eventData(parsed: Record<string, unknown>): Record<string, unknown> {
+  return parsed.data && typeof parsed.data === 'object'
+    ? (parsed.data as Record<string, unknown>)
+    : {}
 }
 
 function _dispatchEvent(
@@ -283,8 +327,11 @@ function _dispatchEvent(
   parsed: Record<string, unknown>,
   cbs: Omit<StreamCallbacks, 'signal'>,
 ): void {
-  const { onConversation, onChunk, onToolCallStart, onToolResult, onInterrupt, onDone, onError } =
-    cbs
+  const { onConversation, onChunk, onToolCallStart, onAgentRouting, onToolResult, onInterrupt, onDone, onError } = cbs
+  const data = _eventData(parsed)
+  const agentName = _string(parsed.agent_name)
+  const namespace = _namespaceOf(parsed)
+  const messageId = _string(parsed.message_id)
 
   switch (event) {
     case 'conversation':
@@ -292,77 +339,65 @@ function _dispatchEvent(
       break
 
     case 'message_chunk': {
-      const agentName = _agentNameOf(parsed)
-      const msgType = parsed.type as string | undefined
-      const messageId =
-        typeof parsed.id === 'string' && parsed.id
-          ? parsed.id
-          : `assistant:${agentName ?? 'main'}`
-
-      // 情况 1：AI 文本内容流。仅接受 ai 消息，避免把 ToolMessage 的
-      // content 当成助手文本追加到气泡里。
-      if (msgType === 'ai' || msgType === 'AIMessageChunk') {
-        const content = parsed.content
-        if (typeof content === 'string' && content) {
-          onChunk(content, messageId, agentName)
-        } else if (Array.isArray(content)) {
-          for (const block of content) {
-            if (block?.type === 'text' && block.text) {
-              onChunk(block.text as string, messageId, agentName)
-            }
-          }
-        }
-      }
-
-      // 情况 2：AI 决定调用工具（tool_calls 非空）
-      const toolCalls = parsed.tool_calls
-      if (Array.isArray(toolCalls) && toolCalls.length > 0) {
-        onToolCallStart(
-          toolCalls.map((tc: Record<string, unknown>) => ({
-            id: (tc.id ?? '') as string,
-            name: (tc.name ?? '') as string,
-            args: (tc.args ?? {}) as Record<string, unknown>,
-            agentName,
-          })),
-        )
-      }
-
-      // 情况 3：工具执行结果（ToolMessage 带 tool_call_id）
-      if (parsed.tool_call_id) {
-        onToolResult({
-          id:
-            typeof parsed.id === 'string' && parsed.id
-              ? parsed.id
-              : `tool-result:${parsed.tool_call_id as string}`,
-          tool_call_id: parsed.tool_call_id as string,
-          content:
-            typeof parsed.content === 'string'
-              ? parsed.content
-              : JSON.stringify(parsed.content ?? ''),
-          toolName: typeof parsed.name === 'string' ? parsed.name : undefined,
-          isError: parsed.status === 'error',
-        })
-      }
+      const content = _string(data.content)
+      if (content) onChunk(content, messageId ?? crypto.randomUUID(), agentName)
       break
     }
 
+    case 'agent_routing':
+      onAgentRouting({
+        id: _string(parsed.event_id) ?? crypto.randomUUID(),
+        toolCallId: _string(data.tool_call_id) ?? '',
+        agentName,
+        targetAgent: _string(data.subagent_type),
+        description: _string(data.description),
+        namespace,
+        eventData: parsed,
+      })
+      break
+
+    case 'tool_call_start':
+      onToolCallStart([{
+        id: _string(data.tool_call_id) ?? '',
+        name: _string(data.tool_name) ?? 'tool',
+        args: data.args && typeof data.args === 'object'
+          ? (data.args as Record<string, unknown>) : {},
+        agentName,
+        namespace,
+        eventData: parsed,
+      }])
+      break
+
+    case 'tool_call_end':
+      onToolResult({
+        id: messageId ?? _string(parsed.event_id) ?? crypto.randomUUID(),
+        tool_call_id: _string(data.tool_call_id) ?? '',
+        content: typeof data.result === 'string' ? data.result : JSON.stringify(data.result ?? ''),
+        toolName: _string(data.tool_name),
+        isError: data.tool_status === 'error',
+        agentName,
+        namespace,
+        eventData: parsed,
+      })
+      break
+
     case 'interrupt': {
-      const actions = Array.isArray(parsed.actions)
-        ? (parsed.actions as InterruptAction[])
+      const actions = Array.isArray(data.actions)
+        ? (data.actions as InterruptAction[])
         : []
-      const allowed = Array.isArray(parsed.allowed_decisions)
-        ? (parsed.allowed_decisions as DecisionType[])
+      const allowed = Array.isArray(data.allowed_decisions)
+        ? (data.allowed_decisions as DecisionType[])
         : []
       onInterrupt({
-        thread_id: (parsed.thread_id ?? '') as string,
-        interrupt_id: parsed.interrupt_id as string | undefined,
-        namespace: Array.isArray(parsed.namespace) ? (parsed.namespace as string[]) : [],
-        interrupt_mode: parsed.interrupt_mode === 'input' ? 'input' : 'approval',
-        resume_mode: parsed.resume_mode === 'value' ? 'value' : 'decisions',
+        thread_id: _string(parsed.thread_id) ?? '',
+        interrupt_id: _string(data.interrupt_id),
+        namespace: namespace ?? [],
+        interrupt_mode: data.interrupt_mode === 'input' ? 'input' : 'approval',
+        resume_mode: data.resume_mode === 'value' ? 'value' : 'decisions',
         allowed_decisions: allowed,
         actions,
-        hint: (parsed.hint ?? '') as string,
-        value: parsed.value,
+        hint: _string(data.hint) ?? '',
+        value: data.value,
       })
       break
     }
@@ -372,7 +407,7 @@ function _dispatchEvent(
       break
 
     case 'error':
-      onError(new Error((parsed.message as string) ?? 'Unknown server error'))
+      onError(new Error(_string(data.message) ?? 'Unknown server error'))
       break
 
     // graph_state — 暂不处理

@@ -10,10 +10,14 @@ import HitlApprovalBar from '@/components/HitlApprovalBar.vue'
 const store = useChatStore()
 const inputValue = ref('')
 const messagesEndRef = ref<HTMLDivElement | null>(null)
-const showToolMessages = ref(false)
+const showToolResults = ref(false)
 
 const visibleMessages = computed(() =>
-  store.messages.filter((message) => message.kind !== 'tool_result' || showToolMessages.value),
+  store.messages.filter(
+    (message) =>
+      !['agent_routing', 'tool_call', 'tool_result'].includes(message.kind) ||
+      showToolResults.value,
+  ),
 )
 
 onMounted(() => {
@@ -110,8 +114,8 @@ const conversationMenuConfig: ConversationsProps['menu'] = () => ({
       <div v-else class="input-area">
         <div class="sender-toolbar">
           <ToolOutlined />
-          <span>Show tool results</span>
-          <a-switch v-model:checked="showToolMessages" size="small" />
+          <span>Show tool calls</span>
+          <a-switch v-model:checked="showToolResults" size="small" />
         </div>
         <!-- 取消按钮（流进行中时显示） -->
         <div v-if="store.loading" class="cancel-bar">

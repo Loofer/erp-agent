@@ -131,6 +131,19 @@ export const useChatStore = defineStore('chat', () => {
           actorName: agentName,
         })
       },
+      onAgentRouting(routing) {
+        upsertMessage({
+          id: routing.id,
+          kind: 'agent_routing',
+          content: '',
+          actorName: routing.agentName,
+          toolCallId: routing.toolCallId,
+          targetAgent: routing.targetAgent,
+          description: routing.description,
+          namespace: routing.namespace,
+          eventData: routing.eventData,
+        })
+      },
       onToolCallStart(calls) {
         for (const call of calls) {
           upsertMessage({
@@ -141,7 +154,8 @@ export const useChatStore = defineStore('chat', () => {
             toolCallId: call.id,
             toolName: call.name,
             toolArgs: call.args,
-            status: 'running',
+            namespace: call.namespace,
+            eventData: call.eventData,
           })
         }
       },
@@ -152,9 +166,11 @@ export const useChatStore = defineStore('chat', () => {
           id: result.id,
           kind: 'tool_result',
           content: result.content,
+          actorName: result.agentName,
           toolCallId: result.tool_call_id,
           toolName: result.toolName,
-          status: result.isError ? 'error' : 'success',
+          namespace: result.namespace,
+          eventData: result.eventData,
         })
       },
       onInterrupt(data) {
