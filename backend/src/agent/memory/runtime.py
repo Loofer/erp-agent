@@ -8,10 +8,9 @@ from deepagents import FilesystemPermission
 from deepagents.backends import (
     CompositeBackend,
     FilesystemBackend,
-    StateBackend,
+    LocalShellBackend,
     StoreBackend,
 )
-from deepagents.backends.protocol import BackendProtocol
 from langgraph.runtime import Runtime
 from langgraph.store.base import BaseStore
 
@@ -43,12 +42,14 @@ def assistant_memory_namespace(
 
 
 def build_agent_backend(
-        default_backend: BackendProtocol | None = None,
         store: BaseStore | None = None,
 ) -> CompositeBackend:
-    """Expose sandbox execution, static files, and durable user memory."""
+    """Expose local shell execution, static files, and durable user memory."""
     backend_root = Path(__file__).resolve().parents[3]
-    runtime_backend = default_backend or StateBackend()
+    runtime_backend = LocalShellBackend(
+        root_dir=backend_root,
+        inherit_env=True,
+    )
     return CompositeBackend(
         default=runtime_backend,
         routes={

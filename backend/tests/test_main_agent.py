@@ -1,6 +1,6 @@
 from typing import Any
 
-from deepagents.backends import CompositeBackend, StoreBackend
+from deepagents.backends import CompositeBackend, LocalShellBackend, StoreBackend
 from langgraph.store.memory import InMemoryStore
 
 from agent.main_agent import create_main_agent
@@ -63,11 +63,10 @@ def test_main_agent_uses_supplied_persistence_dependencies(monkeypatch: Any) -> 
     assert backend.routes["/memories/"]._store is supplied_store
 
 
-def test_main_agent_uses_supplied_sandbox_as_default_backend(
+def test_main_agent_uses_local_shell_as_default_backend(
     monkeypatch: Any,
 ) -> None:
     captured: dict[str, object] = {}
-    sandbox_backend = object()
 
     def fake_create_deep_agent(**kwargs: object) -> object:
         captured.update(kwargs)
@@ -77,16 +76,12 @@ def test_main_agent_uses_supplied_sandbox_as_default_backend(
         "agent.main_agent.deepagents.create_deep_agent", fake_create_deep_agent
     )
 
-    create_main_agent(
-        "test:model",
-        subagents=(),
-        sandbox_backend=sandbox_backend,
-    )
+    create_main_agent("test:model", subagents=())
 
     backend = captured["backend"]
     assert isinstance(backend, CompositeBackend)
-    assert backend.default is sandbox_backend
-    assert backend.routes["/sandbox/"] is sandbox_backend
+    assert isinstance(backend.default, LocalShellBackend)
+    assert backend.routes["/sandbox/"] is backend.default
 
 
 def test_deployment_entrypoint_loads_yaml_before_creating_main_agent(
@@ -119,14 +114,12 @@ def test_deployment_entrypoint_loads_yaml_before_creating_main_agent(
         checkpointer: object | None = None,
         store: object | None = None,
         rag_retriever: object | None = None,
-        sandbox_backend: object | None = None,
     ) -> object:
         captured["model"] = model
         captured["subagents"] = subagents
         captured["checkpointer"] = checkpointer
         captured["store"] = store
         captured["rag_retriever"] = rag_retriever
-        captured["sandbox_backend"] = sandbox_backend
         return expected_graph
 
     monkeypatch.setattr(main_agent_module, "create_main_agent", fake_create_main_agent)
@@ -135,7 +128,6 @@ def test_deployment_entrypoint_loads_yaml_before_creating_main_agent(
     assert captured["subagents"] == expected_definitions
     assert captured["checkpointer"] is None
     assert captured["store"] is None
-    assert captured["sandbox_backend"] is None
 
 
 def test_langgraph_dev_entrypoint_uses_default_persistence(monkeypatch: Any) -> None:

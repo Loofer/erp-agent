@@ -116,6 +116,7 @@ class ChatService:
                 # With version="v2" every chunk is a single dict shaped
                 # {"type", "ns", "data", ...} — subgraphs=True puts the
                 # namespace under "ns" rather than wrapping in a tuple.
+                logging.debug("[chat_service] threadId: %s Graph chunk: %r",thread_id, chunk)
                 chunk_type = chunk.get("type")
                 ns_list = list(chunk.get("ns") or ())
                 if chunk_type == "values":

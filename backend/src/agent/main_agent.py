@@ -5,7 +5,6 @@ from pathlib import Path
 
 import deepagents
 from backend.configs.settings import load_settings
-from deepagents.backends.protocol import BackendProtocol
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
@@ -43,7 +42,6 @@ def create_main_agent(
         model: ChatOpenAI,
         *,
         subagents: tuple[SubagentDefinition, ...],
-        sandbox_backend: BackendProtocol | None = None,
         checkpointer: BaseCheckpointSaver | None = None,
         store: BaseStore | None = None,
         rag_retriever: HybridRetriever | None = None,
@@ -69,7 +67,7 @@ def create_main_agent(
         subagents=deep_agent_subagents,
         skills=["/skills/main/"],
         memory=["/memory/AGENTS.md", "/memories/preferences.md"],
-        backend=build_agent_backend(sandbox_backend, store=store),
+        backend=build_agent_backend(store=store),
         debug=settings.debug,
         permissions=build_runtime_permissions(),
         checkpointer=checkpointer,
@@ -92,7 +90,6 @@ def load_agent_graph(
         checkpointer: BaseCheckpointSaver | None = None,
         store: BaseStore | None = None,
         rag_retriever: HybridRetriever | None = None,
-        sandbox_backend: BackendProtocol | None = None,
 ) -> CompiledStateGraph:
     """Load YAML subagents and build the deployment graph."""
     settings = load_settings()
@@ -113,7 +110,6 @@ def load_agent_graph(
     return create_main_agent(
         model,
         subagents=subagents,
-        sandbox_backend=sandbox_backend,
         checkpointer=checkpointer,
         store=store,
         rag_retriever=rag_retriever,

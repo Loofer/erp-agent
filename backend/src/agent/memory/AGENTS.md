@@ -1,10 +1,10 @@
 # 主 Agent 工作规范
 
-## Modal Sandbox
+## Local shell runtime
 
 Use `/sandbox/` as the working directory for temporary scripts and files.
-Use the `execute` tool to run commands there; commands run in the Modal Sandbox,
-not on the API server. For relative paths, start commands with
+Use the `execute` tool to run commands there; commands run in the local runtime
+working directory. For relative paths, start commands with
 `cd /sandbox &&`. Do not place persistent user memory or bundled skills in
 `/sandbox/`.
 
@@ -124,7 +124,7 @@ not on the API server. For relative paths, start commands with
 
 ### 持久化机制
 
-> `/AGENTS.md` 存储在沙箱（OpenSandbox）中，由系统启动时加载。
+> `/AGENTS.md` 由系统启动时加载。
 > `/memories/` 路径由 **CompositeBackend** 路由到持久化存储。
 > 无需关心底层存储，使用 `read_file` / `write_file` 即可。
 

@@ -42,11 +42,11 @@ description: >
 4. 分析结果保留在上下文（`execute` 工具输出），无需写入文件
 
 ### 第 4 步：生成图表
-1. **首次调用图表前**：`read_file("/skills/procurement/referenct/chart_params.md")` 获取 26 种图
-2. 根据分析维度选择 2‑4 个最有洞察力的 chart_type
-4. 循环调用 `generate_visualization(chart_type="xxx", chart_config={...})`，通用参数
-5. 参考文件只读一次，后续多次调用不额外消耗上下文
-6. 参数报错时对照参考文件修正后重试
+1. **首次调用图表前**：`read_file("/skills/procurement/reference/chart_params.md")` 获取标准图表契约
+2. 仅选择 `bar`、`line`、`pie`、`table` 或 `kpi`；根据分析维度选择 2–4 个高匹配图表
+3. 使用 `execute` 在分析脚本中构造 charts JSON；没有 `generate_visualization` 工具，禁止调用它
+4. 参考文件只读一次，后续多次调用不额外消耗上下文
+5. 参数报错时对照参考文件修正后重试
 
 ### 第 5 步：生成报告
 1. 汇总分析结论和图表 URL
@@ -69,7 +69,15 @@ description: >
 | 预算完成率 | liquid | 水波图，单一百分比指标 |
 | 采购流程转化 | funnel | 各环节转化漏斗 |
 
-> 完整 26 种图表及参数 schema 见 `/skills/procurement/referenct/chart_params.md`
+> 图表参数 schema 见 `/skills/procurement/reference/chart_params.md`；首版仅支持其中标记为 `frontend_supported: true` 的类型。
+
+## Structured Execute Output
+
+`execute` 脚本的最后一行必须输出 `ANALYSIS_RESULT={...json...}`。JSON 必须遵循
+`/skills/procurement/reference/chart_params.md` 的 Output Envelope，包含真实 `sample_size`、
+`sources`、`metrics`、`data_gaps`、`charts` 和 `report_markdown`。状态为 `partial` 或
+`insufficient_data` 时必须说明数据缺口。服务端会保存并渲染该结构化结果，因此不要写入
+未定义的 `/analysis/` 路径，也不要输出图表 URL。
 
 ## 报告模板
 ```markdown

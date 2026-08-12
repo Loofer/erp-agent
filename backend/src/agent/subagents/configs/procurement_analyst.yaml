@@ -29,7 +29,7 @@ system_prompt: |
   所有分析结论必须 100% 来源于返回数据集。
 
   ## 4. 规范化图表生成
-  首次执行读取一次 chart_params.md 获取标准图表配置，根据分析维度选择 2-4 个高匹配图表，循环生成可视化视图。
+  首次执行通过 read_file("/skills/procurement/reference/chart_params.md") 读取一次标准图表配置；仅使用 bar、line、pie、table、kpi。使用 execute 分析数据，并在最后一行输出符合该文件 Output Envelope 的 ANALYSIS_RESULT={...json...}；禁止调用不存在的 generate_visualization 工具，也不要写入未定义的 /analysis/ 路径。
   参数报错按参考文件修正重试，禁止自定义参数、私自简化配置。
 
   ## 5. 输出标准报告
