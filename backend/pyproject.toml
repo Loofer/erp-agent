@@ -27,9 +27,13 @@ build-backend = "hatchling.build"
 
 [project.optional-dependencies]
 rag-rerank = ["FlagEmbedding>=1.4,<2"]
+evals = [
+    "langchain-community>=0.3.31,<0.4",
+    "ragas==0.4.3",
+]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agent", "src/api_view", "src/visualization"]
+packages = ["src/agent", "src/api_view", "src/visualization", "evals"]
 
 [[tool.uv.index]]
 url = "https://mirrors.aliyun.com/pypi/simple/"
@@ -44,7 +48,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = [".", "src"]
 testpaths = ["tests"]
 cache_dir = "../.pytest_cache"
 

@@ -47,20 +47,40 @@ def create_main_agent(
         rag_retriever: HybridRetriever | None = None,
 ) -> CompiledStateGraph:
     """Build the primary Deep Agents runtime from declarative configuration."""
+    return _create_main_agent(
+        model,
+        subagents=subagents,
+        checkpointer=checkpointer,
+        store=store,
+        rag_retriever=rag_retriever,
+    )
+
+
+def _create_main_agent(
+        model: ChatOpenAI,
+        *,
+        subagents: tuple[SubagentDefinition, ...],
+        checkpointer: BaseCheckpointSaver | None = None,
+        store: BaseStore | None = None,
+        rag_retriever: HybridRetriever | None = None,
+        api_client: ApiClient | None = None,
+) -> CompiledStateGraph:
+    """Build the graph with optional dependency injection for offline evaluation."""
     settings = load_settings()
-    api_token = (
-        settings.motorparts_api_token.get_secret_value()
-        if settings.motorparts_api_token
-        else None
-    )
-    client = ApiClient(
-        settings.motorparts_api_base_url,
-        api_token=api_token,
-    )
+    if api_client is None:
+        api_token = (
+            settings.motorparts_api_token.get_secret_value()
+            if settings.motorparts_api_token
+            else None
+        )
+        api_client = ApiClient(
+            settings.motorparts_api_base_url,
+            api_token=api_token,
+        )
 
     parent_tools = build_knowledge_tools(rag_retriever)
 
-    subagent_tools = build_subagent_only_tools(client)
+    subagent_tools = build_subagent_only_tools(api_client)
 
     tools_by_name = {
         tool.name: tool for tool in [*parent_tools, *subagent_tools]
@@ -104,6 +124,8 @@ def load_agent_graph(
         checkpointer: BaseCheckpointSaver | None = None,
         store: BaseStore | None = None,
         rag_retriever: HybridRetriever | None = None,
+        api_client: ApiClient | None = None,
+        model_name: str | None = None,
 ) -> CompiledStateGraph:
     """Load YAML subagents and build the deployment graph."""
     settings = load_settings()
@@ -113,7 +135,7 @@ def load_agent_graph(
         except Exception:  # noqa: BLE001
             rag_retriever = None
     model = ChatOpenAI(
-        model=settings.motorparts_agent_model,
+        model=model_name or settings.motorparts_agent_model,
         api_key=settings.motorparts_model_api_key,
         base_url=settings.motorparts_model_base_url,
 
@@ -121,12 +143,21 @@ def load_agent_graph(
 
     config_directory = Path(__file__).parent / "subagents" / "configs"
     subagents = load_subagent_definitions(config_directory)
-    return create_main_agent(
+    if api_client is None:
+        return create_main_agent(
+            model,
+            subagents=subagents,
+            checkpointer=checkpointer,
+            store=store,
+            rag_retriever=rag_retriever,
+        )
+    return _create_main_agent(
         model,
         subagents=subagents,
         checkpointer=checkpointer,
         store=store,
         rag_retriever=rag_retriever,
+        api_client=api_client,
     )
 
 

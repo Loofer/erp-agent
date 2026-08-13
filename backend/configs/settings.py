@@ -5,7 +5,6 @@ from pathlib import Path
 from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 DEFAULT_MOTORPARTS_AGENT_MODEL = "gpt-5.4-mini"
 DEFAULT_MOTORPARTS_AGENT_ID = "motorparts-agent"
 DEFAULT_LANGSMITH_ENDPOINT = "https://api.smith.langchain.com"
@@ -122,6 +121,24 @@ class Settings(BaseSettings):
     reranker_enabled: bool = Field(
         default=True,
         validation_alias=AliasChoices("RERANKER_ENABLED", "reranker_enabled"),
+    )
+    ragas_judge_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("RAGAS_JUDGE_API_KEY", "ragas_judge_api_key"),
+    )
+    ragas_judge_base_url: str = Field(
+        default="https://api.openai.com/v1",
+        validation_alias=AliasChoices("RAGAS_JUDGE_BASE_URL", "ragas_judge_base_url"),
+    )
+    ragas_judge_model: str = Field(
+        default="gpt-5.4-mini",
+        validation_alias=AliasChoices("RAGAS_JUDGE_MODEL", "ragas_judge_model"),
+    )
+    ragas_judge_embedding_model: str = Field(
+        default="text-embedding-3-small",
+        validation_alias=AliasChoices(
+            "RAGAS_JUDGE_EMBEDDING_MODEL", "ragas_judge_embedding_model"
+        ),
     )
 
     @field_validator("motorparts_api_token", mode="before")

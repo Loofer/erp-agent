@@ -10,3 +10,4 @@
 # RAG ingestion runtime state
 backend/doc/.rag-state.json
 /backend/logs/app.log
+/backend/evals/experiments/*.csv

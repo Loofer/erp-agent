@@ -1,0 +1,56 @@
+[
+  {
+    "id": "rag-001",
+    "category": "rag",
+    "input": "BP-100 适配哪个电机平台？最小起订量是多少？",
+    "reference_answer": "BP-100 适配 MP-2024 电机平台，建议最小起订量为 20 套。",
+    "expected_tools": ["search_knowdge"],
+    "required_facts": ["BP-100", "MP-2024", "20"],
+    "grading_notes": "必须准确回答知识库中的兼容平台和最小起订量。"
+  },
+  {
+    "id": "supplier-001",
+    "category": "supplier_query",
+    "input": "查询 Northwind Components 供应商信息。",
+    "reference_answer": "Northwind Components 是供应商 SUP-001，信用等级为 A。",
+    "expected_tools": ["supplier_query"],
+    "required_facts": ["Northwind Components", "SUP-001", "A"],
+    "grading_notes": "应调用供应商查询工具，并引用 fixture 返回的供应商字段。"
+  },
+  {
+    "id": "part-001",
+    "category": "part_query",
+    "input": "查询 BP-100 刹车片的物料信息和采购价。",
+    "reference_answer": "BP-100 是刹车片，采购价为 60 元/套。",
+    "expected_tools": ["part_query"],
+    "required_facts": ["BP-100", "60"],
+    "grading_notes": "应使用精确物料查询，并正确报告物料和价格。"
+  },
+  {
+    "id": "order-001",
+    "category": "order_query",
+    "input": "查询 BP-100 最近的采购订单价格和数量。",
+    "reference_answer": "最近订单采购价为 60 元，采购数量为 20 套。",
+    "expected_tools": ["order_search_details"],
+    "required_facts": ["60", "20"],
+    "grading_notes": "应使用订单明细查询，不应创建或更新订单。"
+  },
+  {
+    "id": "inventory-001",
+    "category": "inventory_query",
+    "input": "有哪些库存预警？请说明 BP-100 当前库存。",
+    "reference_answer": "BP-100 当前库存为 8 套，低于安全库存 20 套，存在库存预警。",
+    "expected_tools": ["inventory_warning"],
+    "required_facts": ["BP-100", "8", "20"],
+    "grading_notes": "应调用库存预警工具，并解释当前库存低于安全库存。"
+  },
+  {
+    "id": "analysis-001",
+    "category": "procurement_analysis",
+    "input": "结合 BP-100 的库存预警和历史采购订单，给出补货建议。",
+    "reference_answer": "BP-100 当前库存 8 套低于安全库存 20 套，历史采购数量为 20 套，建议至少补货 20 套并确认交期。",
+    "expected_tools": ["inventory_warning", "order_search_details"],
+    "required_facts": ["8", "20", "补货"],
+    "grading_notes": "应同时查询库存和历史订单，再给出基于数据的补货建议。"
+  }
+]
