@@ -1,15 +1,32 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { DownloadOutlined } from '@ant-design/icons-vue'
-import * as echarts from 'echarts'
-import type { ECharts, EChartsOption } from 'echarts'
+import { BarChart, LineChart, PieChart } from 'echarts/charts'
+import {
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+} from 'echarts/components'
+import * as echarts from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import type { EChartsCoreOption, EChartsType } from 'echarts/core'
 import { chartSpecToEChartsOption } from '@/visualization/chart'
 import type { ChartSpec } from '@/visualization/chart'
+
+echarts.use([
+  BarChart,
+  LineChart,
+  PieChart,
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+  CanvasRenderer,
+])
 
 const props = defineProps<{ chart: ChartSpec }>()
 const chartElement = ref<HTMLDivElement | null>(null)
 const rendered = ref(false)
-let instance: ECharts | null = null
+let instance: EChartsType | null = null
 let resizeObserver: ResizeObserver | null = null
 const renderError = ref<string | null>(null)
 
@@ -27,7 +44,7 @@ function render() {
   try {
     instance?.dispose()
     instance = echarts.init(chartElement.value)
-    instance.setOption(option.value as EChartsOption, { notMerge: true })
+    instance.setOption(option.value as EChartsCoreOption, { notMerge: true })
     rendered.value = true
     renderError.value = null
   } catch (error) {

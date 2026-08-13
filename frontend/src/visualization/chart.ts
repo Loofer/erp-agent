@@ -1,4 +1,4 @@
-import type { EChartsOption } from 'echarts'
+import type { EChartsCoreOption } from 'echarts/core'
 
 export type ChartType = 'bar' | 'line' | 'pie' | 'table' | 'kpi'
 
@@ -47,12 +47,12 @@ export function parseMessageSegments(content: string): MessageSegment[] {
   return segments
 }
 
-export function chartSpecToEChartsOption(spec: ChartSpec): EChartsOption | null {
+export function chartSpecToEChartsOption(spec: ChartSpec): EChartsCoreOption | null {
   if (!spec.chartable || spec.chart_type === 'table' || spec.chart_type === 'kpi') {
     return null
   }
 
-  const base: EChartsOption = {
+  const base: EChartsCoreOption = {
     color: ['#1677ff', '#13a8a8', '#fa8c16', '#722ed1', '#eb2f96', '#52c41a'],
     tooltip: { trigger: spec.chart_type === 'pie' ? 'item' : 'axis' },
     grid: { left: 48, right: 24, top: 24, bottom: 40, containLabel: true },

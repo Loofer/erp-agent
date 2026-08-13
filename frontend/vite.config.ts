@@ -23,6 +23,31 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'charts',
+              test: /node_modules[\\/](echarts|zrender)[\\/]/,
+              priority: 2,
+              maxSize: 400_000,
+              includeDependenciesRecursively: false,
+            },
+            {
+              name: 'vendor',
+              test: /node_modules[\\/]/,
+              priority: 1,
+              maxSize: 400_000,
+              entriesAware: true,
+              includeDependenciesRecursively: false,
+            },
+          ],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

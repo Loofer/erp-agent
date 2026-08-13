@@ -1,6 +1,4 @@
-from langchain.agents.middleware import ToolCallLimitMiddleware, PIIMiddleware
-
-from agent.middlewares import RequestContextPromptMiddleware
+from langchain.agents.middleware import PIIMiddleware, ToolCallLimitMiddleware
 
 tool_call_limit_middleware = ToolCallLimitMiddleware(
     thread_limit=15,
@@ -32,7 +30,7 @@ phone_number_pii_middleware = PIIMiddleware(
     strategy="redact",
     apply_to_input=True,
     apply_to_output=False,
-    apply_to_tool_results=False
+    apply_to_tool_results=False,
 )
 
 id_card_pii_middleware = PIIMiddleware(
@@ -41,5 +39,5 @@ id_card_pii_middleware = PIIMiddleware(
     strategy="redact",
     apply_to_input=True,
     apply_to_output=False,
-    apply_to_tool_results=False
+    apply_to_tool_results=False,
 )

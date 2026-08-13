@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-
 from backend.configs.settings import Settings
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from .hybrid_retriever import HybridRetriever
 from .milvus_store import MilvusChunkStore

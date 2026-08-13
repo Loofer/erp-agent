@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h } from 'vue'
+import { computed, defineAsyncComponent, h } from 'vue'
 import {
   ApartmentOutlined,
   RobotOutlined,
@@ -12,7 +12,8 @@ import { marked } from 'marked'
 import type { ChatMessage } from '@/api/chat'
 import { parseMessageSegments } from '@/visualization/chart'
 import InterruptCard from './InterruptCard.vue'
-import ChartCard from './analysis/ChartCard.vue'
+
+const ChartCard = defineAsyncComponent(() => import('./analysis/ChartCard.vue'))
 
 const props = defineProps<{ message: ChatMessage }>()
 
