@@ -19,8 +19,8 @@ def build_hybrid_retriever(settings: Settings) -> HybridRetriever | None:
     embedding_model = OpenAIEmbeddings(
         model=settings.embed_model,
         dimensions=settings.embed_dim,
-        api_key=settings.api_key,
-        base_url=settings.base_url or None,
+        api_key=settings.motorparts_model_api_key,
+        base_url=settings.motorparts_model_base_url or None,
     )
     provider = OpenAIEmbeddingProvider(embedding_model)
     store = MilvusChunkStore(
@@ -32,9 +32,9 @@ def build_hybrid_retriever(settings: Settings) -> HybridRetriever | None:
     )
     store.ensure_collection()
     rewrite_model = ChatOpenAI(
-        model=settings.model,
-        api_key=settings.api_key,
-        base_url=settings.base_url or None,
+        model=settings.motorparts_agent_model,
+        api_key=settings.motorparts_model_api_key,
+        base_url=settings.motorparts_model_base_url or None,
     )
     reranker = None
     if settings.reranker_enabled:

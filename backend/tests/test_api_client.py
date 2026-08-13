@@ -4,6 +4,20 @@ import pytest
 from agent.tools.http_base import ApiClient, ApiClientError
 
 
+def test_api_client_sends_configured_bearer_token() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["Authorization"] == "Bearer erp-secret"
+        return httpx.Response(200, json={"code": 200, "data": {}})
+
+    client = ApiClient(
+        "https://motorparts.test",
+        api_token="erp-secret",
+        transport=httpx.MockTransport(handler),
+    )
+
+    client.get("/parts")
+
+
 def test_request_sends_a_get_request() -> None:
     requests: list[httpx.Request] = []
 

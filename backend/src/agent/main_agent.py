@@ -48,7 +48,15 @@ def create_main_agent(
 ) -> CompiledStateGraph:
     """Build the primary Deep Agents runtime from declarative configuration."""
     settings = load_settings()
-    client = ApiClient(settings.api_base_url)
+    api_token = (
+        settings.motorparts_api_token.get_secret_value()
+        if settings.motorparts_api_token
+        else None
+    )
+    client = ApiClient(
+        settings.motorparts_api_base_url,
+        api_token=api_token,
+    )
 
     parent_tools = build_knowledge_tools(rag_retriever)
 
@@ -105,9 +113,9 @@ def load_agent_graph(
         except Exception:  # noqa: BLE001
             rag_retriever = None
     model = ChatOpenAI(
-        model=settings.model,
-        api_key=settings.api_key,
-        base_url=settings.base_url,
+        model=settings.motorparts_agent_model,
+        api_key=settings.motorparts_model_api_key,
+        base_url=settings.motorparts_model_base_url,
 
     )
 

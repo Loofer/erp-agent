@@ -3,9 +3,9 @@
 import argparse
 from pathlib import Path
 
+from backend.configs.settings import load_settings
 from langchain_openai import OpenAIEmbeddings
 
-from backend.configs.settings import load_settings
 from agent.rag.ingest import DirectoryIngestor
 from agent.rag.milvus_store import MilvusChunkStore
 from agent.rag.parsers import ParserRegistry
@@ -32,8 +32,8 @@ def main() -> None:
             OpenAIEmbeddings(
                 model=settings.embed_model,
                 dimensions=settings.embed_dim,
-                api_key=settings.api_key,
-                base_url=settings.base_url or None,
+                api_key=settings.motorparts_model_api_key,
+                base_url=settings.motorparts_model_base_url or None,
             )
         )
     store = MilvusChunkStore(

@@ -19,11 +19,14 @@ class ApiClient:
         self,
         base_url: str,
         *,
+        api_token: str | None = None,
         transport: httpx.BaseTransport | None = None,
         timeout: float = 10.0,
     ) -> None:
+        headers = {"Authorization": f"Bearer {api_token}"} if api_token else None
         self._client = httpx.Client(
             base_url=base_url,
+            headers=headers,
             transport=transport,
             timeout=timeout,
         )

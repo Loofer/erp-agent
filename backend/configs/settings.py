@@ -5,10 +5,10 @@ from pathlib import Path
 from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEFAULT_API_BASE_URL = "http://47.92.108.163:8081"
-DEFAULT_MODEL = "gpt-5.4-mini"
-DEFAULT_AGENT_ID = "motorparts-agent"
-DEFAULT_RAG_COLLECTION = "motorparts_knowledge"
+
+DEFAULT_MOTORPARTS_AGENT_MODEL = "gpt-5.4-mini"
+DEFAULT_MOTORPARTS_AGENT_ID = "motorparts-agent"
+DEFAULT_LANGSMITH_ENDPOINT = "https://api.smith.langchain.com"
 
 
 class Settings(BaseSettings):
@@ -16,35 +16,60 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    api_base_url: str = Field(
-        default=DEFAULT_API_BASE_URL,
-        validation_alias=AliasChoices("MOTORPARTS_API_BASE_URL", "api_base_url"),
+    debug: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("DEBUG_ENABLED", "debug"),
     )
-    api_token: SecretStr | None = Field(
+    log_level: str = Field(
+        default="INFO",
+        validation_alias=AliasChoices("LOG_LEVEL", "log_level"),
+    )
+    log_file: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("MOTORPARTS_API_TOKEN", "api_token"),
+        validation_alias=AliasChoices("LOG_FILE", "log_file"),
     )
-    base_url: str = Field(
+    motorparts_api_base_url: str = Field(
         default="",
-        validation_alias=AliasChoices("MOTORPARTS_MODEL_BASE_URL", "base_url"),
+        validation_alias="MOTORPARTS_API_BASE_URL",
     )
-    api_key: SecretStr = Field(
+    motorparts_api_token: SecretStr | None = Field(
+        default=None,
+        validation_alias="MOTORPARTS_API_TOKEN",
+    )
+    motorparts_model_base_url: str = Field(
         default="",
-        validation_alias=AliasChoices("MOTORPARTS_MODEL_API_KEY", "api_key"),
+        validation_alias="MOTORPARTS_MODEL_BASE_URL",
     )
-    model: str = Field(
-        default=DEFAULT_MODEL,
-        validation_alias=AliasChoices("MOTORPARTS_AGENT_MODEL", "model"),
+    motorparts_model_api_key: SecretStr = Field(
+        default="",
+        validation_alias="MOTORPARTS_MODEL_API_KEY",
     )
-    agent_id: str = Field(
-        default=DEFAULT_AGENT_ID,
-        validation_alias=AliasChoices("MOTORPARTS_AGENT_ID", "agent_id"),
+    motorparts_agent_model: str = Field(
+        default=DEFAULT_MOTORPARTS_AGENT_MODEL,
+        validation_alias="MOTORPARTS_AGENT_MODEL",
+    )
+    motorparts_agent_id: str = Field(
+        default=DEFAULT_MOTORPARTS_AGENT_ID,
+        validation_alias="MOTORPARTS_AGENT_ID",
     )
     database_url: str = Field(
         validation_alias=AliasChoices("DATABASE_URL", "database_url")
     )
-    debug: bool = Field(
-        validation_alias=AliasChoices("DEBUG_ENABLED", "debug")
+    langsmith_tracing: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("LANGSMITH_TRACING", "langsmith_tracing"),
+    )
+    langsmith_endpoint: str = Field(
+        default=DEFAULT_LANGSMITH_ENDPOINT,
+        validation_alias=AliasChoices("LANGSMITH_ENDPOINT", "langsmith_endpoint"),
+    )
+    langsmith_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("LANGSMITH_API_KEY", "langsmith_api_key"),
+    )
+    langsmith_project: str = Field(
+        default="erp-agent",
+        validation_alias=AliasChoices("LANGSMITH_PROJECT", "langsmith_project"),
     )
     zilliz_uri: str = Field(
         default="",
@@ -55,7 +80,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ZILLIZ_TOKEN", "zilliz_token"),
     )
     milvus_collection: str = Field(
-        default=DEFAULT_RAG_COLLECTION,
+        default="",
         validation_alias=AliasChoices("MILVUS_COLLECTION", "milvus_collection"),
     )
     embed_model: str = Field(
@@ -71,19 +96,19 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("RAG_SOURCE_ROOT", "rag_source_root"),
     )
     parent_chunk_size: int = Field(
-        default=1000,
+        default=1200,
         validation_alias=AliasChoices("PARENT_CHUNK_SIZE", "parent_chunk_size"),
     )
     parent_overlap: int = Field(
-        default=120,
+        default=150,
         validation_alias=AliasChoices("PARENT_OVERLAP", "parent_overlap"),
     )
     child_chunk_size: int = Field(
-        default=240,
+        default=250,
         validation_alias=AliasChoices("CHILD_CHUNK_SIZE", "child_chunk_size"),
     )
     child_overlap: int = Field(
-        default=32,
+        default=50,
         validation_alias=AliasChoices("CHILD_OVERLAP", "child_overlap"),
     )
     semantic_threshold: float = Field(
@@ -98,11 +123,8 @@ class Settings(BaseSettings):
         default=True,
         validation_alias=AliasChoices("RERANKER_ENABLED", "reranker_enabled"),
     )
-    log_level: str = Field(
-        default="info",
-        validation_alias=AliasChoices("LOG_LEVEL", "log_level"),
-    )
-    @field_validator("api_token", mode="before")
+
+    @field_validator("motorparts_api_token", mode="before")
     @classmethod
     def empty_api_token_is_none(cls, value: str | None) -> str | None:
         """Preserve the previous treatment of an empty optional API token."""

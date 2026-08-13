@@ -102,7 +102,6 @@ Copy `.env.example` to `.env` and fill in the required values.
 | `MOTORPARTS_API_TOKEN` | no | `None` | Bearer token for the ERP API (empty = no auth) |
 | `MOTORPARTS_AGENT_ID` | no | `motorparts-agent` | Scopes persistent memory and conversation records |
 | `DEBUG_ENABLED` | no | `False` | Enables Deep Agents debug logging |
-| `DEEPAGENTS_DISABLE_BEDROCK_CACHE_MIDDLEWARE` | no | — | Set to `true` when not using Bedrock |
 
 > `*` Required when using a non-OpenAI endpoint (e.g., ModelScope, local Ollama).
 

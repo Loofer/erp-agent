@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI):
                 app.state.chat_service = ChatService(
                     graph,
                     conversations,
-                    agent_id=settings.agent_id,
+                    agent_id=settings.motorparts_agent_id,
                     rag_retriever=rag_retriever,
                     debug=settings.debug,
                 )
