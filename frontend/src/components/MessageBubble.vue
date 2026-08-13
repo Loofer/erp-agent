@@ -10,16 +10,23 @@ import { Bubble } from 'ant-design-x-vue'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import type { ChatMessage } from '@/api/chat'
+import { parseMessageSegments } from '@/visualization/chart'
 import InterruptCard from './InterruptCard.vue'
+import ChartCard from './analysis/ChartCard.vue'
 
 const props = defineProps<{ message: ChatMessage }>()
 
-const renderedContent = computed(() => {
-  if (props.message.kind !== 'assistant' || !props.message.content) {
-    return props.message.content
+const contentSegments = computed(() => {
+  if (props.message.kind !== 'assistant') return []
+  if (props.message.namespace?.length) {
+    return [{ type: 'markdown' as const, content: props.message.content }]
   }
+  return parseMessageSegments(props.message.content)
+})
+
+function renderMarkdown(content: string): string {
   try {
-    const raw = marked.parse(props.message.content, { async: false }) as string
+    const raw = marked.parse(content, { async: false }) as string
     return DOMPurify.sanitize(raw, {
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'u', 'code', 'pre', 'ul', 'ol', 'li',
@@ -28,9 +35,9 @@ const renderedContent = computed(() => {
       ALLOWED_ATTR: ['href', 'class'],
     })
   } catch {
-    return props.message.content
+    return content
   }
-})
+}
 
 const avatar = computed(() =>
   props.message.role === 'user'
@@ -93,12 +100,17 @@ const formattedArgs = computed(() => {
         {{ message.actorName }}
       </span>
       <InterruptCard v-if="message.interrupted" :interrupt="message.interrupted" />
-      <div
-        v-if="message.content"
-        class="bubble-text"
-        :class="{ 'markdown-body': message.role === 'assistant' }"
-        v-html="renderedContent"
-      />
+      <template v-if="message.role === 'assistant'">
+        <template v-for="(segment, index) in contentSegments" :key="`${message.id}:${index}`">
+          <div
+            v-if="segment.type === 'markdown' && segment.content"
+            class="bubble-text markdown-body"
+            v-html="renderMarkdown(segment.content)"
+          />
+          <ChartCard v-else-if="segment.type === 'chart'" :chart="segment.chart" />
+        </template>
+      </template>
+      <div v-else-if="message.content" class="bubble-text">{{ message.content }}</div>
     </template>
   </Bubble>
 </template>

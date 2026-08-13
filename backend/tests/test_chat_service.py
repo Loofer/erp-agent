@@ -192,7 +192,10 @@ def test_checkpoint_messages_become_a_flat_timeline_with_tool_results() -> None:
 
 
 def test_semantic_events_distinguish_routing_from_tool_calls() -> None:
-    from api_view.chat_service import _semantic_calls_from_state, _semantic_message_events
+    from api_view.chat_service import (
+        _semantic_calls_from_state,
+        _semantic_message_events,
+    )
 
     task = AIMessage(
         content="",
@@ -244,23 +247,43 @@ def test_semantic_events_distinguish_routing_from_tool_calls() -> None:
     assert end_events[0]["event"] == "tool_call_end"
 
 
-def test_execute_result_emits_analysis_chart_and_report_events() -> None:
+def test_plain_execute_result_only_emits_tool_end() -> None:
+    from api_view.chat_service import _semantic_message_events
+
+    events = _semantic_message_events(
+        ToolMessage(content="average=12.3", name="execute", tool_call_id="call-execute"),
+        "thread-1", [], {},
+    )
+
+    assert [event["event"] for event in events] == ["tool_call_end"]
+
+
+def test_execute_chart_document_remains_a_regular_tool_result() -> None:
     from api_view.chat_service import _semantic_message_events
 
     stdout = (
-        'ANALYSIS_RESULT={"version":"1.0","status":"ok",'
-        '"summary":{"sample_size":1,"sources":["part_search"],'
-        '"metrics":[],"data_gaps":[]},"charts":[{'
+        "calculation complete\n"
+        '{"type":"chart","version":"1.0","charts":[{'
         '"id":"price","chart_type":"bar","title":"Price",'
-        '"x":"supplier","y":"value","data":[{"supplier":"A","value":1}]}'
-        '],"report_markdown":"# Report"}'
+        '"x":"supplier","y":"value","data":[{"supplier":"A","value":1}],'
+        '"provenance":["order_search_details"],"warnings":[]}]}'
     )
     events = _semantic_message_events(
         ToolMessage(content=stdout, name="execute", tool_call_id="call-execute", id="tool-execute"),
         "thread-1", [], {},
     )
 
-    assert [event["event"] for event in events] == ["tool_call_end", "analysis", "chart", "report"]
-    assert events[2]["data"]["chart"]["echarts"]["series"][0]["type"] == "bar"
-    assert events[3]["data"]["markdown"] == "# Report"
-    assert end_events[0]["data"]["tool_call_id"] == "call-search"
+    assert [event["event"] for event in events] == ["tool_call_end"]
+    assert events[0]["data"]["result"] == stdout
+
+
+def test_invalid_execute_chart_document_remains_a_regular_tool_result() -> None:
+    from api_view.chat_service import _semantic_message_events
+
+    stdout = '{"type":"chart","version":"1.0","charts":[{"id":"missing-fields"}]}'
+    events = _semantic_message_events(
+        ToolMessage(content=stdout, name="execute", tool_call_id="call-execute"),
+        "thread-1", [], {},
+    )
+
+    assert [event["event"] for event in events] == ["tool_call_end"]

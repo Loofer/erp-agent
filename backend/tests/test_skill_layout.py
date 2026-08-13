@@ -14,5 +14,8 @@ def test_skill_documents_describe_current_tools_and_native_approval() -> None:
     assert supplier_guide.is_file()
     assert "supplier_manager" in memory_guide.read_text(encoding="utf-8")
     assert "supplier_query" in analysis_guide.read_text(encoding="utf-8")
+    assert "chart_params.md" in analysis_guide.read_text(encoding="utf-8")
+    assert "不得为图表安装或使用 `matplotlib`" in analysis_guide.read_text(encoding="utf-8")
+    assert "引号不得添加多余反斜杠" in analysis_guide.read_text(encoding="utf-8")
     assert "create_supplier" in supplier_guide.read_text(encoding="utf-8")
     assert "request_supplier_info" in supplier_guide.read_text(encoding="utf-8")

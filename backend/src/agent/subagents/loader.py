@@ -3,9 +3,13 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 import yaml
-from deepagents import SubAgent
+from deepagents import FilesystemMiddleware, SubAgent
+from deepagents.backends import LocalShellBackend
+
+SubagentBackend = Literal["local_shell"]
 
 
 @dataclass(frozen=True)
@@ -19,6 +23,7 @@ class SubagentDefinition:
     tools: tuple[str, ...]
     interrupt_on: dict[str, bool | dict[str, list[str]]] = field(default_factory=dict)
     skills: tuple[str, ...] = ()
+    backend: SubagentBackend | None = None
 
 
 class SubagentConfigurationError(ValueError):
@@ -53,9 +58,19 @@ def _load_definition(path: Path) -> SubagentDefinition:
     system_prompt = _required_string(document, "system_prompt", path)
     model = _optional_string(document, "model", path)
     tools = _tools(document, path)
+    backend = _backend(document, path)
     interrupt_on = _interrupt_on(document, path)
     skills = _skills(document, path)
-    return SubagentDefinition(name, description, system_prompt, model, tools, interrupt_on, skills)
+    return SubagentDefinition(
+        name=name,
+        description=description,
+        system_prompt=system_prompt,
+        model=model,
+        tools=tools,
+        interrupt_on=interrupt_on,
+        skills=skills,
+        backend=backend,
+    )
 
 
 def _required_string(document: Mapping[object, object], field: str, path: Path) -> str:
@@ -83,6 +98,17 @@ def _tools(document: Mapping[object, object], path: Path) -> tuple[str, ...]:
         _non_empty_string(tool, f"tools[{index}]", path)
         for index, tool in enumerate(value)
     )
+
+
+def _backend(document: Mapping[object, object], path: Path) -> SubagentBackend | None:
+    value = _optional_string(document, "backend", path)
+    if value is None:
+        return None
+    if value != "local_shell":
+        raise SubagentConfigurationError(
+            f"{path.name} field 'backend' must be 'local_shell'."
+        )
+    return "local_shell"
 
 
 def _interrupt_on(
@@ -154,6 +180,8 @@ def _validate_unique_names(definitions: tuple[SubagentDefinition, ...]) -> None:
 def to_deep_agent_subagents(
     definitions: tuple[SubagentDefinition, ...],
     tools_by_name: Mapping[str, object],
+    *,
+    backend_root: Path | None = None,
 ) -> list[SubAgent]:
     """Convert validated YAML definitions to Deep Agents SubAgent instances."""
     subagents: list[SubAgent] = []
@@ -183,5 +211,18 @@ def to_deep_agent_subagents(
         # a subsequent TypeError in create_summarization_middleware.
         if definition.model is not None:
             sub_agent["model"] = definition.model
+        if definition.backend == "local_shell":
+            if backend_root is None:
+                raise SubagentConfigurationError(
+                    f"{definition.name} requires a backend_root for local_shell."
+                )
+            sub_agent["middleware"] = [
+                FilesystemMiddleware(
+                    backend=LocalShellBackend(
+                        root_dir=backend_root,
+                        inherit_env=True,
+                    ),
+                )
+            ]
         subagents.append(sub_agent)
     return subagents

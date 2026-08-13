@@ -3,29 +3,31 @@ import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'v
 import { DownloadOutlined } from '@ant-design/icons-vue'
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
-import type { ChartPayload } from '@/api/chat'
+import { chartSpecToEChartsOption } from '@/visualization/chart'
+import type { ChartSpec } from '@/visualization/chart'
 
-const props = defineProps<{ chart: ChartPayload }>()
+const props = defineProps<{ chart: ChartSpec }>()
 const chartElement = ref<HTMLDivElement | null>(null)
 const rendered = ref(false)
 let instance: ECharts | null = null
 let resizeObserver: ResizeObserver | null = null
 const renderError = ref<string | null>(null)
 
-const rows = computed(() => props.chart.spec?.data ?? [])
+const rows = computed(() => props.chart.data)
 const columns = computed(() => {
   const result: string[] = []
   for (const row of rows.value) for (const key of Object.keys(row)) if (!result.includes(key)) result.push(key)
   return result.slice(0, 12)
 })
-const canRenderChart = computed(() => Boolean(props.chart.echarts && props.chart.spec?.chartable !== false && props.chart.spec?.chart_type !== 'table' && props.chart.spec?.chart_type !== 'kpi'))
+const option = computed(() => chartSpecToEChartsOption(props.chart))
+const canRenderChart = computed(() => option.value !== null)
 
 function render() {
   if (!chartElement.value || !canRenderChart.value) return
   try {
     instance?.dispose()
     instance = echarts.init(chartElement.value)
-    instance.setOption(props.chart.echarts as EChartsOption, { notMerge: true })
+    instance.setOption(option.value as EChartsOption, { notMerge: true })
     rendered.value = true
     renderError.value = null
   } catch (error) {
@@ -40,7 +42,7 @@ function exportPng() {
   if (!instance) return
   const link = document.createElement('a')
   link.href = instance.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' })
-  link.download = `${props.chart.spec?.id || 'procurement-chart'}.png`
+  link.download = `${props.chart.id || 'procurement-chart'}.png`
   link.click()
 }
 
@@ -63,25 +65,25 @@ onBeforeUnmount(() => {
   <section class="chart-card">
     <header class="chart-header">
       <div>
-        <h3>{{ chart.spec?.title || 'Chart' }}</h3>
-        <p v-if="chart.spec?.subtitle" class="chart-subtitle">{{ chart.spec.subtitle }}</p>
+        <h3>{{ chart.title }}</h3>
+        <p v-if="chart.subtitle" class="chart-subtitle">{{ chart.subtitle }}</p>
       </div>
       <div class="chart-actions">
-        <a-tag>{{ chart.spec?.chart_type || 'table' }}</a-tag>
+        <a-tag>{{ chart.chart_type }}</a-tag>
         <a-button v-if="rendered" type="text" size="small" :icon="h(DownloadOutlined)" title="Export PNG" @click="exportPng" />
       </div>
     </header>
     <div v-if="canRenderChart && !renderError" ref="chartElement" class="chart-canvas" />
     <div v-else class="table-fallback">
-      <a-alert v-if="renderError || chart.reason" type="warning" show-icon :message="renderError || chart.reason" />
+      <a-alert v-if="renderError" type="warning" show-icon :message="renderError" />
       <table v-if="columns.length" class="data-table">
         <thead><tr><th v-for="column in columns" :key="column">{{ column }}</th></tr></thead>
         <tbody><tr v-for="(row, index) in rows" :key="index"><td v-for="column in columns" :key="column">{{ row[column] }}</td></tr></tbody>
       </table>
       <a-empty v-else description="No chart data" />
     </div>
-    <footer v-if="chart.spec?.provenance?.length" class="chart-footer">Sources: {{ chart.spec.provenance.join(', ') }}</footer>
-    <ul v-if="chart.spec?.warnings?.length" class="chart-warnings"><li v-for="warning in chart.spec.warnings" :key="warning">{{ warning }}</li></ul>
+    <footer v-if="chart.provenance.length" class="chart-footer">Sources: {{ chart.provenance.join(', ') }}</footer>
+    <ul v-if="chart.warnings.length" class="chart-warnings"><li v-for="warning in chart.warnings" :key="warning">{{ warning }}</li></ul>
   </section>
 </template>
 

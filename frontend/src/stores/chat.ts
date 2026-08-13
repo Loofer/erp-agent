@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { fetchHistory, fetchThreadArtifacts, resumeChat, streamChat } from '@/api/chat'
-import type { AnalysisSummary, ChatArtifact, ChatMessage, ChartPayload, ConversationItem, StreamCallbacks } from '@/api/chat'
+import { fetchHistory, fetchThreadMessages, resumeChat, streamChat } from '@/api/chat'
+import type { ChatMessage, ConversationItem, StreamCallbacks } from '@/api/chat'
 import type { InterruptData, ResumePayload } from '@/types/agent'
 
 export const useChatStore = defineStore('chat', () => {
@@ -11,19 +11,6 @@ export const useChatStore = defineStore('chat', () => {
   const loading = ref(false)
   const pendingInterrupt = ref<InterruptData | null>(null)
   const abortController = ref<AbortController | null>(null)
-  const charts = ref<ChartPayload[]>([])
-  const analysisSummary = ref<AnalysisSummary | null>(null)
-  const report = ref<string | null>(null)
-
-  function clearArtifacts() { charts.value = []; analysisSummary.value = null; report.value = null }
-  function restoreArtifacts(artifacts: ChatArtifact[]) {
-    clearArtifacts()
-    for (const artifact of artifacts) {
-      if (artifact.type === 'analysis') analysisSummary.value = artifact.payload as unknown as AnalysisSummary
-      else if (artifact.type === 'chart') charts.value.push(artifact.payload as unknown as ChartPayload)
-      else if (artifact.type === 'report') report.value = typeof artifact.payload.markdown === 'string' ? artifact.payload.markdown : null
-    }
-  }
 
   async function loadHistory() {
     conversations.value = await fetchHistory()
@@ -33,13 +20,10 @@ export const useChatStore = defineStore('chat', () => {
     if (currentThreadId.value === threadId) return
     currentThreadId.value = threadId
     messages.value = []
-    clearArtifacts()
     pendingInterrupt.value = null
     loading.value = true
     try {
-      const payload = await fetchThreadArtifacts(threadId)
-      messages.value = payload.messages
-      restoreArtifacts(payload.artifacts)
+      messages.value = await fetchThreadMessages(threadId)
     } finally {
       loading.value = false
     }
@@ -48,7 +32,6 @@ export const useChatStore = defineStore('chat', () => {
   function newConversation() {
     currentThreadId.value = null
     messages.value = []
-    clearArtifacts()
     pendingInterrupt.value = null
   }
 
@@ -133,11 +116,12 @@ export const useChatStore = defineStore('chat', () => {
           : threadId.slice(0, 8)
         conversations.value.unshift({ key: threadId, label, timestamp: Date.now() })
       },
-      onChunk(chunk, messageId, agentName) {
+      onChunk(chunk, messageId, agentName, namespace) {
         const existing = messages.value.find((message) => message.id === messageId)
         if (existing) {
           existing.content += chunk
           existing.loading = false
+          existing.namespace = namespace
           return
         }
         messages.value.push({
@@ -146,6 +130,7 @@ export const useChatStore = defineStore('chat', () => {
           role: 'assistant',
           content: chunk,
           actorName: agentName,
+          namespace,
         })
       },
       onAgentRouting(routing) {
@@ -200,14 +185,6 @@ export const useChatStore = defineStore('chat', () => {
         })
         pendingInterrupt.value = data
       },
-      onAnalysis(summary) { analysisSummary.value = summary },
-      onChart(chart) {
-        const key = chart.spec?.id
-        const index = key ? charts.value.findIndex((item) => item.spec?.id === key) : -1
-        if (index >= 0) charts.value[index] = chart
-        else charts.value.push(chart)
-      },
-      onReport(markdown) { report.value = markdown },
       onDone() {
         loading.value = false
         abortController.value = null
@@ -232,9 +209,6 @@ export const useChatStore = defineStore('chat', () => {
     currentThreadId,
     loading,
     pendingInterrupt,
-    charts,
-    analysisSummary,
-    report,
     loadHistory,
     selectConversation,
     newConversation,

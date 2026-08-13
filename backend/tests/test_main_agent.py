@@ -1,5 +1,7 @@
+from pathlib import Path
 from typing import Any
 
+from deepagents import FilesystemMiddleware
 from deepagents.backends import CompositeBackend, LocalShellBackend, StoreBackend
 from langgraph.store.memory import InMemoryStore
 
@@ -82,6 +84,37 @@ def test_main_agent_uses_local_shell_as_default_backend(
     assert isinstance(backend, CompositeBackend)
     assert isinstance(backend.default, LocalShellBackend)
     assert backend.routes["/sandbox/"] is backend.default
+
+
+def test_main_agent_configures_local_shell_for_declared_subagent(
+    monkeypatch: Any,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_create_deep_agent(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(
+        "agent.main_agent.deepagents.create_deep_agent", fake_create_deep_agent
+    )
+    definition = SubagentDefinition(
+        name="procurement_analyst",
+        description="Analyzes procurement data.",
+        system_prompt="Use execute for calculations.",
+        model=None,
+        tools=(),
+        backend="local_shell",
+    )
+
+    create_main_agent("test:model", subagents=(definition,))
+
+    subagent = captured["subagents"][0]
+    middleware = subagent["middleware"]
+    assert len(middleware) == 1
+    assert isinstance(middleware[0], FilesystemMiddleware)
+    assert isinstance(middleware[0].backend, LocalShellBackend)
+    assert middleware[0].backend.cwd == Path(__file__).resolve().parents[1]
 
 
 def test_deployment_entrypoint_loads_yaml_before_creating_main_agent(

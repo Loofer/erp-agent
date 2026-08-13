@@ -58,8 +58,6 @@ def test_application_lifespan_initializes_chat_service(monkeypatch) -> None:
             return None
 
     class FakeSaver:
-        conn = object()
-
         @classmethod
         def from_conn_string(cls, _: str) -> "FakeSaver":
             return cls()
@@ -73,9 +71,21 @@ def test_application_lifespan_initializes_chat_service(monkeypatch) -> None:
         async def setup(self) -> None:
             return None
 
+    class FakeConnection:
+        @classmethod
+        async def connect(cls, _: str, **kwargs: object) -> "FakeConnection":
+            assert kwargs == {"autocommit": True}
+            return cls()
+
+        async def __aenter__(self) -> Self:
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
     class FakeConversationRepository:
         def __init__(self, connection: object) -> None:
-            assert connection is FakeSaver.conn
+            assert isinstance(connection, FakeConnection)
 
         async def setup(self) -> None:
             return None
@@ -84,6 +94,7 @@ def test_application_lifespan_initializes_chat_service(monkeypatch) -> None:
 
     monkeypatch.setattr(web_main, "PostgresStore", FakeStore)
     monkeypatch.setattr(web_main, "AsyncPostgresSaver", FakeSaver)
+    monkeypatch.setattr(web_main, "AsyncConnection", FakeConnection)
     monkeypatch.setattr(web_main, "ConversationRepository", FakeConversationRepository)
     monkeypatch.setattr(web_main, "build_hybrid_retriever", lambda _: None)
 

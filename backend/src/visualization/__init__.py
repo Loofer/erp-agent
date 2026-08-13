@@ -1,6 +1,6 @@
-"""Validated chart payloads for procurement analysis."""
+"""Validated chart payloads emitted by code execution."""
 
 from .renderer_contract import build_chart_payload
-from .schema import AnalysisResult, ChartSpec, parse_analysis_result
+from .schema import ChartDocumentError, ChartSpec, parse_chart_documents
 
-__all__ = ["AnalysisResult", "ChartSpec", "build_chart_payload", "parse_analysis_result"]
+__all__ = ["ChartDocumentError", "ChartSpec", "build_chart_payload", "parse_chart_documents"]

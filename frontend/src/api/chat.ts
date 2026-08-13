@@ -154,63 +154,15 @@ export interface ToolCallStart {
   eventData?: Record<string, unknown>
 }
 
-export async function fetchThreadArtifacts(threadId: string): Promise<{ messages: ChatMessage[]; artifacts: ChatArtifact[] }> {
-  try {
-    const res = await fetch(`/api/chat/${encodeURIComponent(threadId)}/messages`, { headers: authHeaders() })
-    if (!res.ok) return { messages: [], artifacts: [] }
-    const data = await res.json() as { messages?: Array<Record<string, unknown>>; artifacts?: ChatArtifact[] }
-    return { messages: (data.messages ?? []).map((m) => ({
-      id: typeof m.id === 'string' && m.id ? m.id : crypto.randomUUID(),
-      kind: ['agent_routing', 'tool_call', 'tool_result', 'user'].includes(String(m.kind)) ? (m.kind as ChatMessage['kind']) : 'assistant',
-      role: m.role === 'user' ? 'user' : m.role === 'assistant' ? 'assistant' : undefined,
-      content: typeof m.content === 'string' ? m.content : '',
-      actorName: typeof m.actor_name === 'string' ? m.actor_name : undefined,
-      toolCallId: typeof m.tool_call_id === 'string' ? m.tool_call_id : undefined,
-      toolName: typeof m.tool_name === 'string' ? m.tool_name : undefined,
-      toolArgs: m.tool_args && typeof m.tool_args === 'object' ? m.tool_args as Record<string, unknown> : undefined,
-      targetAgent: typeof m.subagent_type === 'string' ? m.subagent_type : undefined,
-      description: typeof m.description === 'string' ? m.description : undefined,
-      status: m.status === 'running' || m.status === 'success' || m.status === 'error' ? m.status : undefined,
-    })), artifacts: data.artifacts ?? [] }
-  } catch { return { messages: [], artifacts: [] } }
-}
-
-export interface AnalysisSummary {
-  status: 'ok' | 'partial' | 'insufficient_data' | 'error'
-  sample_size: number
-  sources: string[]
-  metrics: Array<{ name: string; value: string | number | null; unit?: string | null }>
-  data_gaps: string[]
-  error?: string
-}
-
-export interface ChatArtifact {
-  type: 'analysis' | 'chart' | 'report' | string
-  key: string
-  payload: Record<string, unknown>
-  created_at?: string | null
-}
-
-/** Structured chart payload used by the optional analysis renderer. */
-export interface ChartPayload {
-  spec: {
-    id?: string
-    title?: string
-    subtitle?: string
-    chart_type?: string
-    chartable?: boolean
-    data?: Array<Record<string, unknown>>
-    provenance?: string[]
-    warnings?: string[]
-  } | null
-  echarts: Record<string, unknown> | null
-  reason?: string
-}
-
 export interface StreamCallbacks {
   onConversation: (threadId: string) => void
   /** AI 文本增量；namespace 用于区分主 agent 与子 agent 的输出 */
-  onChunk: (chunk: string, messageId: string, agentName?: string) => void
+  onChunk: (
+    chunk: string,
+    messageId: string,
+    agentName?: string,
+    namespace?: string[],
+  ) => void
   /** AI 决定调用工具 */
   onToolCallStart: (calls: ToolCallStart[]) => void
   onAgentRouting: (routing: {
@@ -234,9 +186,6 @@ export interface StreamCallbacks {
     eventData?: Record<string, unknown>
   }) => void
   onInterrupt: (data: InterruptData) => void
-  onAnalysis: (summary: AnalysisSummary) => void
-  onChart: (chart: ChartPayload) => void
-  onReport: (markdown: string) => void
   onDone: () => void
   onError: (err: Error) => void
   /** 外部 AbortController.signal，用于取消流 */
@@ -367,7 +316,7 @@ function _dispatchEvent(
   parsed: Record<string, unknown>,
   cbs: Omit<StreamCallbacks, 'signal'>,
 ): void {
-  const { onConversation, onChunk, onToolCallStart, onAgentRouting, onToolResult, onInterrupt, onAnalysis, onChart, onReport, onDone, onError } = cbs
+  const { onConversation, onChunk, onToolCallStart, onAgentRouting, onToolResult, onInterrupt, onDone, onError } = cbs
   const data = _eventData(parsed)
   const agentName = _string(parsed.agent_name)
   const namespace = _namespaceOf(parsed)
@@ -380,7 +329,9 @@ function _dispatchEvent(
 
     case 'message_chunk': {
       const content = _string(data.content)
-      if (content) onChunk(content, messageId ?? crypto.randomUUID(), agentName)
+      if (content) {
+        onChunk(content, messageId ?? crypto.randomUUID(), agentName, namespace)
+      }
       break
     }
 
@@ -444,16 +395,6 @@ function _dispatchEvent(
 
     case 'complete':
       onDone()
-      break
-
-    case 'analysis':
-      onAnalysis({ status: data.status === 'partial' || data.status === 'insufficient_data' || data.status === 'error' ? data.status : 'ok', sample_size: typeof data.sample_size === 'number' ? data.sample_size : 0, sources: Array.isArray(data.sources) ? data.sources.filter((x): x is string => typeof x === 'string') : [], metrics: Array.isArray(data.metrics) ? data.metrics as AnalysisSummary['metrics'] : [], data_gaps: Array.isArray(data.data_gaps) ? data.data_gaps.filter((x): x is string => typeof x === 'string') : [], error: _string(data.error) })
-      break
-    case 'chart':
-      if (data.chart && typeof data.chart === 'object') onChart(data.chart as ChartPayload)
-      break
-    case 'report':
-      if (typeof data.markdown === 'string') onReport(data.markdown)
       break
 
     case 'error':

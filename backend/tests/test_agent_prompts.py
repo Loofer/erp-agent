@@ -8,6 +8,8 @@ def test_system_prompt_contains_operating_constraints() -> None:
     assert "汽车零部件采购助手" in prompt
     assert "ERP" in prompt
     assert "人工审批" in prompt
+    assert "子代理文件交接" in prompt
+    assert "read_file" in prompt
 
 
 def test_runtime_middlewares_include_request_context_prompt() -> None:

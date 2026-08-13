@@ -7,6 +7,8 @@ description: >
 
 # 采购分析技能（操作手册）
 
+本文件统一定义复杂采购分析的流程、数据口径、图表限制和报告输出要求。简单查询或少量指标分析可由代理直接回答；仅在需要多维度分析、图表、评分、策略或长报告时读取并执行本文件。子代理配置负责基础工具使用和复杂度分流。
+
 ## 适用场景
 - 供应商比价分析（多供应商、同物料价格对比）
 - 物料行情评估（价格趋势、供需分析）
@@ -33,51 +35,26 @@ description: >
 
 ### 第 3 步：执行分析
 1. 编写 Python 分析脚本，使用 `execute` 工具运行
-2. 如需安装依赖：`pip install -i https://mirrors.aliyun.com/pypi/simple/ pandas matplotlib`
+2. 优先使用 Python 标准库；确需表格计算时可使用环境中已有的 `pandas`。不得为图表安装或使用 `matplotlib` 等绘图库。
 3. 常见分析维度：
     - 价格对比：最低价、均价、最高价、价差百分比（基于内部历史订单）
     - 供应商评估：信用评级 + 价格 + 交期加权
     - 物料质量：内部记录的规格参数对比
     - 综合排名：多维度加权评分
-4. 分析结果保留在上下文（`execute` 工具输出），无需写入文件
+4. 分析结果保留在上下文。普通计算输出无需特殊格式；仅在需要图表时输出第 4 步定义的 chart JSON。
 
 ### 第 4 步：生成图表
-1. **首次调用图表前**：`read_file("/skills/procurement/reference/chart_params.md")` 获取标准图表契约
-2. 仅选择 `bar`、`line`、`pie`、`table` 或 `kpi`；根据分析维度选择 2–4 个高匹配图表
-3. 使用 `execute` 在分析脚本中构造 charts JSON；没有 `generate_visualization` 工具，禁止调用它
+1. **首次生成图表前**：`read_file("/skills/procurement/procurement-analysis/reference/chart_params.md")` 获取 chart JSON 契约。
+2. 仅选择 `bar`、`line`、`pie`、`table` 或 `kpi`；根据分析维度选择少量高匹配图表。
+3. 使用 `execute` 输出单行 chart JSON。不要使用变量前缀、Markdown 代码块、HTML 或 ECharts 配置；Python 源码中的引号不得添加多余反斜杠。
 4. 参考文件只读一次，后续多次调用不额外消耗上下文
 5. 参数报错时对照参考文件修正后重试
+6. 禁止生成 PNG、JPG、JPEG、SVG、PDF 或 HTML 图表文件；。
 
-### 第 5 步：生成报告
-1. 汇总分析结论和图表 URL
-2. 写入 `/analysis/report_{timestamp}.md`
-
-## 图表类型速查
-
-| 分析目的 | chart_type | 说明 |
-| ---- | ---- | ---- |
-| 供应商价格横向对比 | bar | 各供应商对同一物料报价 |
-| 物料采购量/金额对比 | column | 按物料/供应商的柱状对比 |
-| 价格/订单量趋势 | line | 时间序列趋势 |
-| 采购金额占比 | pie | 按分类或供应商的饼图 |
-| 供应商多维度评分 | radar | 价格/质量/交期/服务多轴 |
-| 价格分布 | histogram | 价格区间分布直方图 |
-| 采购金额层级 | treemap | 分类→物料层级占比 |
-| 供应商‑物料关系 | network_graph | 供应关系拓扑图 |
-| 交货周期分布 | boxplot | 各供应商交货周期箱线图 |
-| 成本构成增减 | waterfall | 采购成本逐项瀑布图 |
-| 预算完成率 | liquid | 水波图，单一百分比指标 |
-| 采购流程转化 | funnel | 各环节转化漏斗 |
-
-> 图表参数 schema 见 `/skills/procurement/reference/chart_params.md`；首版仅支持其中标记为 `frontend_supported: true` 的类型。
-
-## Structured Execute Output
-
-`execute` 脚本的最后一行必须输出 `ANALYSIS_RESULT={...json...}`。JSON 必须遵循
-`/skills/procurement/reference/chart_params.md` 的 Output Envelope，包含真实 `sample_size`、
-`sources`、`metrics`、`data_gaps`、`charts` 和 `report_markdown`。状态为 `partial` 或
-`insufficient_data` 时必须说明数据缺口。服务端会保存并渲染该结构化结果，因此不要写入
-未定义的 `/analysis/` 路径，也不要输出图表 URL。
+### 第 5 步：生成复杂报告
+1. 根据分析结果汇总报告；报告中引用图表标题或图表清单，不生成或拼装图表 URL。
+2. 简单报告直接在回复中返回，不写文件。复杂长报告调用 `write_file` 写入 `/analysis/report_{timestamp}.md`，其中 `timestamp` 为 Unix 时间戳；数据不足时仍可落盘并明确缺口。
+3. 返回轻量摘要、报告路径，并明确提示必须调用 `read_file` 读取报告后再向用户回答；不得建议用户自行查看内部路径。
 
 ## 报告模板
 ```markdown
@@ -95,27 +72,27 @@ description: >
 
 ## 三、价格分析
 ### 3.1 各供应商报价对比
-[插入图表URL]
+[图表：供应商报价对比]
 描述最高价、最低价、均价、价差幅度，识别内部订单中的异常报价。
 
 ### 3.2 价格趋势分析
-[插入图表URL]
+[图表：价格趋势]
 内部历史价格波动分析。
 
 ## 四、供应商综合评估
 ### 4.1 多维度评分
-[插入雷达图URL]
+[图表：供应商评分；首版不支持 radar 时改用 table 或文字说明]
 从价格、质量、交期、服务进行加权打分，输出供应商排名。
 
 ### 4.2 交货周期表现
-[插入箱线图URL]
+[图表：交货周期；首版不支持 boxplot 时改用 table 或文字说明]
 各供应商交付稳定性、延期风险识别。
 
 ## 五、物料质量与规格对比
 对比内部记录各家物料参数差异，识别规格不匹配、质量风险点。
 
 ## 六、采购成本与预算情况
-[插入饼图/瀑布图URL]
+[图表：成本构成；仅使用契约支持的 pie、bar、table 或 kpi]
 成本构成、预算完成情况、成本增减项说明。
 
 ## 七、关键结论

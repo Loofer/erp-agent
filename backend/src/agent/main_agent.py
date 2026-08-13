@@ -58,7 +58,13 @@ def create_main_agent(
         tool.name: tool for tool in [*parent_tools, *subagent_tools]
     }
 
-    deep_agent_subagents = to_deep_agent_subagents(subagents, tools_by_name)
+    backend_root = Path(__file__).resolve().parents[2]
+    runtime_permissions = build_runtime_permissions()
+    deep_agent_subagents = to_deep_agent_subagents(
+        subagents,
+        tools_by_name,
+        backend_root=backend_root,
+    )
     return deepagents.create_deep_agent(
         model=model,
         name="erp-agent",
@@ -69,7 +75,7 @@ def create_main_agent(
         memory=["/memory/AGENTS.md", "/memories/preferences.md"],
         backend=build_agent_backend(store=store),
         debug=settings.debug,
-        permissions=build_runtime_permissions(),
+        permissions=runtime_permissions,
         checkpointer=checkpointer,
         store=store,
         middleware=[

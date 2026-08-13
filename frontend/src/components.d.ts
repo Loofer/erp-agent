@@ -22,7 +22,6 @@ declare module 'vue' {
     HitlApprovalBar: typeof import('./components/HitlApprovalBar.vue')['default']
     InterruptCard: typeof import('./components/InterruptCard.vue')['default']
     MessageBubble: typeof import('./components/MessageBubble.vue')['default']
-    ReportMarkdown: typeof import('./components/analysis/ReportMarkdown.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ToolCallItem: typeof import('./components/ToolCallItem.vue')['default']

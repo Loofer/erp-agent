@@ -1,6 +1,8 @@
 from pathlib import Path
 
 import pytest
+from deepagents import FilesystemMiddleware
+from deepagents.backends import LocalShellBackend
 
 from agent.subagents.loader import (
     SubagentConfigurationError,
@@ -66,7 +68,13 @@ def test_shipped_subagent_definitions_cover_research_analysis_and_order() -> Non
     analyst_definition = next(
         definition for definition in definitions if definition.name == "procurement_analyst"
     )
+    assert analyst_definition.backend == "local_shell"
     assert analyst_definition.skills == ("/skills/procurement/",)
+    assert "chart_params.md" in analyst_definition.system_prompt
+    assert "前端 ECharts" in analyst_definition.system_prompt
+    assert "禁止使用 matplotlib" in analyst_definition.system_prompt
+    assert "不得写 `d[\\'key\\']`" in analyst_definition.system_prompt
+    assert "Main Agent 使用 read_file" in analyst_definition.system_prompt
     assert order_definition.skills == ("/skills/order/",)
     supplier_definition = next(
         definition for definition in definitions if definition.name == "supplier_manager"
@@ -121,6 +129,29 @@ def test_subagent_interrupt_and_skills_remain_on_the_subagent() -> None:
     ]
 
 
+def test_local_shell_backend_adds_subagent_filesystem_middleware(tmp_path: Path) -> None:
+    definition = SubagentDefinition(
+        name="procurement_analyst",
+        description="Analyzes procurement data.",
+        system_prompt="Use execute for calculations.",
+        model=None,
+        tools=(),
+        backend="local_shell",
+    )
+
+    subagents = to_deep_agent_subagents(
+        (definition,),
+        {},
+        backend_root=tmp_path,
+    )
+
+    middleware = subagents[0]["middleware"]
+    assert len(middleware) == 1
+    assert isinstance(middleware[0], FilesystemMiddleware)
+    assert isinstance(middleware[0].backend, LocalShellBackend)
+    assert middleware[0].backend.cwd == tmp_path.resolve()
+
+
 @pytest.mark.parametrize(
     ("content", "message"),
     [
@@ -138,6 +169,14 @@ system_prompt: Gather evidence before responding.
 tools: invalid_tool
 """,
             "tools",
+        ),
+        (
+            """name: sample
+description: Investigates supplier and market questions.
+system_prompt: Gather evidence before responding.
+backend: remote_shell
+""",
+            "backend",
         ),
     ],
 )

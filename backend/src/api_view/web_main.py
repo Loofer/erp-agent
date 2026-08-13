@@ -15,10 +15,11 @@ from backend.logs.logging_config import setup_logging
 from fastapi import FastAPI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres import PostgresStore
+from psycopg import AsyncConnection
 
 from agent.main_agent import load_agent_graph
 from agent.rag.runtime import build_hybrid_retriever
-1
+
 from .auth import JwtIdentityMiddleware
 from .chat import router as chat_router
 from .chat_persistence import ConversationRepository
@@ -44,34 +45,38 @@ async def lifespan(app: FastAPI):
             settings.database_url
         ) as checkpointer:
             await checkpointer.setup()
-            conversations = ConversationRepository(checkpointer.conn)
-            await conversations.setup()
+            async with await AsyncConnection.connect(
+                settings.database_url,
+                autocommit=True,
+            ) as conversation_connection:
+                conversations = ConversationRepository(conversation_connection)
+                await conversations.setup()
 
-            rag_retriever = None
-            try:
-                rag_retriever = await asyncio.to_thread(
-                    build_hybrid_retriever, settings
+                rag_retriever = None
+                try:
+                    rag_retriever = await asyncio.to_thread(
+                        build_hybrid_retriever, settings
+                    )
+                except Exception:  # noqa: BLE001
+                    _log.exception("RAG initialisation failed; continuing without retrieval")
+
+                _log.info("Initialising agent graph......")
+                graph = await asyncio.to_thread(
+                    load_agent_graph,
+                    checkpointer=checkpointer,
+                    store=store,
+                    rag_retriever=rag_retriever,
                 )
-            except Exception:  # noqa: BLE001
-                _log.exception("RAG initialisation failed; continuing without retrieval")
+                _log.info("Agent graph ready.")
 
-            _log.info("Initialising agent graph......")
-            graph = await asyncio.to_thread(
-                load_agent_graph,
-                checkpointer=checkpointer,
-                store=store,
-                rag_retriever=rag_retriever,
-            )
-            _log.info("Agent graph ready.")
-
-            app.state.chat_service = ChatService(
-                graph,
-                conversations,
-                agent_id=settings.agent_id,
-                rag_retriever=rag_retriever,
-                debug=settings.debug,
-            )
-            yield
+                app.state.chat_service = ChatService(
+                    graph,
+                    conversations,
+                    agent_id=settings.agent_id,
+                    rag_retriever=rag_retriever,
+                    debug=settings.debug,
+                )
+                yield
 
 
 app = FastAPI(title="Motorparts Agent", lifespan=lifespan)
