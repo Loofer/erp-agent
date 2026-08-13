@@ -12,7 +12,13 @@ def test_skill_documents_describe_current_tools_and_native_approval() -> None:
     assert management_guide.is_file()
     assert analysis_guide.is_file()
     assert supplier_guide.is_file()
-    assert "supplier_manager" in memory_guide.read_text(encoding="utf-8")
+    memory_content = memory_guide.read_text(encoding="utf-8")
+    assert "supplier_manager" in memory_content
+    assert "/memory/AGENTS.md" in memory_content
+    assert "/memories/preferences.md" in memory_content
+    assert "config.configurable.user_id" in memory_content
+    assert "持久化到 `/per`" not in memory_content
+    assert "assign_skill" not in memory_content
     assert "supplier_query" in analysis_guide.read_text(encoding="utf-8")
     assert "chart_params.md" in analysis_guide.read_text(encoding="utf-8")
     assert "不得为图表安装或使用 `matplotlib`" in analysis_guide.read_text(encoding="utf-8")

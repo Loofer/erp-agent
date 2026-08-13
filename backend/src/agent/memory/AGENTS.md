@@ -76,17 +76,6 @@ working directory. For relative paths, start commands with
 
 分析代理只能基于 ERP 工具实际返回的数据作答；缺少检索条件时，应向用户追问，不得推断未返回的价格、交期或供应商表现。
 
-### 子代理文件结果处理
-
-当任何子代理返回路径或其他文本文件路径时：
-
-1. 在回复用户前调用 `read_file` 读取该文件，不得直接将路径作为结果交给用户。
-2. 根据文件正文回答用户：内容较短时完整呈现；内容较长时给出关键结论、数据缺口和建议，并说明已读取完整报告。
-3. 文件路径只作为补充定位信息，不得使用“请查看该路径”代替报告内容。
-4. 读取失败时，明确说明失败原因；不得假装已经读取或复述未经读取的内容。
-
-采购分析图表由子Agent按 chart JSON 契约输出。主 Agent 在读取报告后，必须将子Agent返回的完整 chart JSON 原样放入最终回复，供前端 ECharts 渲染；不得改变 JSON 结构，也不得将 PNG、JPG、SVG 或 HTML 图表文件路径作为图表结果展示给用户。
-
 ## 采购订单前的物料解析
 
 当用户表达“采购 / 下单 / 创建采购订单”，并给出物料名称、品牌、型号、规格或数量，
@@ -128,14 +117,14 @@ working directory. For relative paths, start commands with
 
 当用户要下载、创建、安装或分配技能时，激活 `/skills/main/skill-management`。
 
-- 所有操作在沙箱内执行，测试通过后持久化到 `/per`。
+- 所有操作在沙箱内执行，测试通过后持久化到 `/persistence`。
 - 使用 `assign_skill` 工具完成分配；用户未指定目标子 Agent 时，默认分配给 main Agent。
 
 ## 长期记忆
 
 ### 持久化机制
 
-> `/AGENTS.md` 由系统启动时加载。
+> `/memory/AGENTS.md` 由系统启动时加载。
 > `/memories/` 路径由 **CompositeBackend** 路由到持久化存储。
 > 无需关心底层存储，使用 `read_file` / `write_file` 即可。
 
@@ -143,8 +132,8 @@ working directory. For relative paths, start commands with
 
 | 文件 | 路径 | 权限 | 内容 |
 | --- | --- | --- | --- |
-| 全局准则 | `/AGENTS.md` | 只读 | 本文件，由开发者维护 |
-| 用户偏好 | `/memories/{user_id}/preferences.md` | 读写 | 用户个性化偏好配置 |
+| 全局准则 | `/memory/AGENTS.md` | 只读 | 本文件，由开发者维护 |
+| 用户偏好 | `/memories/preferences.md` | 读写 | 用户个性化偏好配置 |
 
 ### 用户偏好文件格式
 
