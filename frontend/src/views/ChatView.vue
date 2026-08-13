@@ -51,11 +51,14 @@ async function handleSend(val: string) {
   if (!val.trim() || store.loading) return
   inputValue.value = ''
 
+  let request: Promise<void>
   if (isInputHitl.value) {
-    await store.resumeInput(val.trim())
+    request = store.resumeInput(val.trim())
   } else {
-    await store.sendMessage(val.trim())
+    request = store.sendMessage(val.trim())
   }
+  await scrollToBottom()
+  await request
   scrollToBottom()
 }
 

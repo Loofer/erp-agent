@@ -12,6 +12,42 @@ export const useChatStore = defineStore('chat', () => {
   const pendingInterrupt = ref<InterruptData | null>(null)
   const abortController = ref<AbortController | null>(null)
 
+  function appendLoadingAssistant(): ChatMessage {
+    const message: ChatMessage = {
+      id: `loading:${crypto.randomUUID()}`,
+      kind: 'assistant',
+      role: 'assistant',
+      content: '',
+      loading: true,
+    }
+    messages.value.push(message)
+    return message
+  }
+
+  function takeLoadingAssistant(): ChatMessage | undefined {
+    return messages.value.find(
+      (message) => message.kind === 'assistant' && message.loading === true,
+    )
+  }
+
+  function removeLoadingAssistant() {
+    messages.value = messages.value.filter(
+      (message) => !(message.kind === 'assistant' && message.loading === true),
+    )
+  }
+
+  function keepLoadingAssistantLast() {
+    const loadingAssistant = takeLoadingAssistant()
+    if (!loadingAssistant) {
+      appendLoadingAssistant()
+      return
+    }
+    const index = messages.value.indexOf(loadingAssistant)
+    if (index === messages.value.length - 1) return
+    messages.value.splice(index, 1)
+    messages.value.push(loadingAssistant)
+  }
+
   async function loadHistory() {
     conversations.value = await fetchHistory()
   }
@@ -39,6 +75,7 @@ export const useChatStore = defineStore('chat', () => {
     abortController.value?.abort()
     abortController.value = null
     loading.value = false
+    removeLoadingAssistant()
   }
 
   async function sendMessage(content: string) {
@@ -54,6 +91,7 @@ export const useChatStore = defineStore('chat', () => {
     loading.value = true
     pendingInterrupt.value = null
     abortController.value = new AbortController()
+    appendLoadingAssistant()
     await streamChat(content.trim(), currentThreadId.value, buildCallbacks())
   }
 
@@ -90,6 +128,7 @@ export const useChatStore = defineStore('chat', () => {
     loading.value = true
     pendingInterrupt.value = null
     abortController.value = new AbortController()
+    appendLoadingAssistant()
     await resumeChat(currentThreadId.value, resumeData, buildCallbacks())
   }
 
@@ -124,6 +163,17 @@ export const useChatStore = defineStore('chat', () => {
           existing.namespace = namespace
           return
         }
+        const loadingAssistant = takeLoadingAssistant()
+        if (loadingAssistant) {
+          Object.assign(loadingAssistant, {
+            id: messageId,
+            content: chunk,
+            loading: false,
+            actorName: agentName,
+            namespace,
+          })
+          return
+        }
         messages.value.push({
           id: messageId,
           kind: 'assistant',
@@ -145,6 +195,7 @@ export const useChatStore = defineStore('chat', () => {
           namespace: routing.namespace,
           eventData: routing.eventData,
         })
+        keepLoadingAssistantLast()
       },
       onToolCallStart(calls) {
         for (const call of calls) {
@@ -160,6 +211,7 @@ export const useChatStore = defineStore('chat', () => {
             eventData: call.eventData,
           })
         }
+        keepLoadingAssistantLast()
       },
       onToolResult(result) {
         const call = messages.value.find((message) => message.toolCallId === result.tool_call_id)
@@ -174,28 +226,36 @@ export const useChatStore = defineStore('chat', () => {
           namespace: result.namespace,
           eventData: result.eventData,
         })
+        keepLoadingAssistantLast()
       },
       onInterrupt(data) {
-        upsertMessage({
+        const interruptMessage: ChatMessage = {
           id: `interrupt:${data.interrupt_id ?? crypto.randomUUID()}`,
           kind: 'assistant',
           role: 'assistant',
           content: '',
           interrupted: data,
-        })
+        }
+        const loadingAssistant = takeLoadingAssistant()
+        if (loadingAssistant) Object.assign(loadingAssistant, interruptMessage, { loading: false })
+        else upsertMessage(interruptMessage)
         pendingInterrupt.value = data
       },
       onDone() {
+        removeLoadingAssistant()
         loading.value = false
         abortController.value = null
       },
       onError(error) {
-        messages.value.push({
+        const errorMessage: ChatMessage = {
           id: crypto.randomUUID(),
           kind: 'assistant',
           role: 'assistant',
           content: `Request failed: ${error.message}`,
-        })
+        }
+        const loadingAssistant = takeLoadingAssistant()
+        if (loadingAssistant) Object.assign(loadingAssistant, errorMessage, { loading: false })
+        else messages.value.push(errorMessage)
         loading.value = false
         abortController.value = null
       },

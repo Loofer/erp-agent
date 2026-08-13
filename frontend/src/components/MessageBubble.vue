@@ -57,37 +57,46 @@ const formattedArgs = computed(() => {
 </script>
 
 <template>
-  <div v-if="message.kind === 'agent_routing'" class="tool-message routing-message">
-    <div class="tool-title"><ApartmentOutlined /><strong>Agent Routing</strong></div>
-    <dl class="tool-details">
-      <template v-if="message.actorName"><dt>Agent Name</dt><dd>{{ message.actorName }}</dd></template>
-      <template v-if="message.targetAgent"><dt>Target Agent</dt><dd><code>{{ message.targetAgent }}</code></dd></template>
-      <template v-if="message.description"><dt>Description</dt><dd><pre class="tool-payload">{{ message.description }}</pre></dd></template>
-    </dl>
+  <div v-if="message.kind === 'agent_routing'" class="assistant-event-row">
+    <span class="assistant-event-avatar"><RobotOutlined /></span>
+    <div class="tool-message routing-message">
+      <div class="tool-title"><ApartmentOutlined /><strong>Agent Routing</strong></div>
+      <dl class="tool-details">
+        <template v-if="message.actorName"><dt>Agent Name</dt><dd>{{ message.actorName }}</dd></template>
+        <template v-if="message.targetAgent"><dt>Target Agent</dt><dd><code>{{ message.targetAgent }}</code></dd></template>
+        <template v-if="message.description"><dt>Description</dt><dd><pre class="tool-payload">{{ message.description }}</pre></dd></template>
+      </dl>
+    </div>
   </div>
 
-  <div v-else-if="message.kind === 'tool_call'" class="tool-message tool-call-message">
-    <div class="tool-title">
-      <ToolOutlined />
-      <strong>Tool Call Start</strong>
+  <div v-else-if="message.kind === 'tool_call'" class="assistant-event-row">
+    <span class="assistant-event-avatar"><RobotOutlined /></span>
+    <div class="tool-message tool-call-message">
+      <div class="tool-title">
+        <ToolOutlined />
+        <strong>Tool Call Start</strong>
+      </div>
+      <dl class="tool-details">
+        <template v-if="message.actorName"><dt>Agent Name</dt><dd>{{ message.actorName }}</dd></template>
+        <dt>Tool Name</dt><dd><code>{{ message.toolName || 'tool' }}</code></dd>
+        <template v-if="formattedArgs"><dt>Args</dt><dd><pre class="tool-payload">{{ formattedArgs }}</pre></dd></template>
+      </dl>
     </div>
-    <dl class="tool-details">
-      <template v-if="message.actorName"><dt>Agent Name</dt><dd>{{ message.actorName }}</dd></template>
-      <dt>Tool Name</dt><dd><code>{{ message.toolName || 'tool' }}</code></dd>
-      <template v-if="formattedArgs"><dt>Args</dt><dd><pre class="tool-payload">{{ formattedArgs }}</pre></dd></template>
-    </dl>
   </div>
 
-  <div v-else-if="message.kind === 'tool_result'" class="tool-message tool-result-message">
-    <div class="tool-title">
-      <ToolOutlined />
-      <strong>Tool Call End</strong>
+  <div v-else-if="message.kind === 'tool_result'" class="assistant-event-row">
+    <span class="assistant-event-avatar"><RobotOutlined /></span>
+    <div class="tool-message tool-result-message">
+      <div class="tool-title">
+        <ToolOutlined />
+        <strong>Tool Call End</strong>
+      </div>
+      <dl class="tool-details">
+        <template v-if="message.actorName"><dt>Agent Name</dt><dd>{{ message.actorName }}</dd></template>
+        <dt>Tool Name</dt><dd><code>{{ message.toolName || 'tool' }}</code></dd>
+        <dt>Result</dt><dd><pre class="tool-payload result-payload">{{ message.content }}</pre></dd>
+      </dl>
     </div>
-    <dl class="tool-details">
-      <template v-if="message.actorName"><dt>Agent Name</dt><dd>{{ message.actorName }}</dd></template>
-      <dt>Tool Name</dt><dd><code>{{ message.toolName || 'tool' }}</code></dd>
-      <dt>Result</dt><dd><pre class="tool-payload result-payload">{{ message.content }}</pre></dd>
-    </dl>
   </div>
 
   <Bubble
@@ -117,6 +126,26 @@ const formattedArgs = computed(() => {
 </template>
 
 <style scoped>
+.assistant-event-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.assistant-event-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 50%;
+  background: #1677ff;
+  color: #fff;
+  font-size: 16px;
+}
+
 .tool-message {
   width: min(680px, 100%);
   padding: 10px 12px;
