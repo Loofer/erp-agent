@@ -21,7 +21,7 @@ def _update_order_request(
     return client.put(f"/api/orders/update/{order_id}", order_payload)
 
 
-def _erp_order_payload(order_payload: dict[str, Any]) -> dict[str, Any]:
+def _motorparts_order_payload(order_payload: dict[str, Any]) -> dict[str, Any]:
     """Remove absent optional fields and preserve integer order quantities."""
     payload = _omit_none(order_payload)
     order_details = payload.get("orderDetail")
@@ -55,7 +55,7 @@ def _search_order_details_request(
     start_date: str | None,
     end_date: str | None,
 ) -> dict[str, object]:
-    """Search historical order details through the shared ERP client."""
+    """Search historical order details through the shared Motorparts client."""
     query = {
         key: value
         for key, value in {
@@ -80,9 +80,9 @@ def build_order_tools(client: ApiClient) -> list[BaseTool]:
                 and must not include the read-only partDetail object.
 
         Returns:
-            The ERP API response containing the created order.
+            The Motorparts API response containing the created order.
         """
-        payload = _erp_order_payload(order_payload)
+        payload = _motorparts_order_payload(order_payload)
         return _create_order_request(client, payload)
 
     @tool(parse_docstring=True)
@@ -92,14 +92,14 @@ def build_order_tools(client: ApiClient) -> list[BaseTool]:
         """Update a procurement order after required human approval.
 
         Args:
-            order_id: ERP identifier of the procurement order to update.
+            order_id: Motorparts identifier of the procurement order to update.
             order_payload: Complete replacement payload. Each orderDetail item uses
                 partId and must not include read-only fields.
 
         Returns:
-            The ERP API response containing the updated order.
+            The Motorparts API response containing the updated order.
         """
-        payload = _erp_order_payload(order_payload)
+        payload = _motorparts_order_payload(order_payload)
         return _update_order_request(client, order_id, payload)
 
     @tool(parse_docstring=True)
@@ -116,7 +116,7 @@ def build_order_tools(client: ApiClient) -> list[BaseTool]:
             endDate: Optional inclusive end date in yyyy-MM-dd format.
 
         Returns:
-            ERP response wrapper with `code` (business status code), `message`
+            Motorparts response wrapper with `code` (business status code), `message`
             (status text), `timestamp` (response epoch milliseconds), and `data`.
             `data` is a list of order details. Each detail contains `id`, `orderId`,
             `partId`, `quantity`, `unitPrice`, `subtotal`, `remark`, `createTime`,

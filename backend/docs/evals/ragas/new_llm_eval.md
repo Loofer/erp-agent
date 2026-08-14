@@ -249,7 +249,7 @@ In this example run:
 ## Re‑Run When New LLMs Are Released
 Once this evaluation workflow lives alongside your project, it becomes a repeatable check. When new LLMs are released (frequently nowadays), plug them in as candidate‑models and re‑run the same evaluation against your fixed baseline.
 
-## Interpret Results and Make Decisions
+## Intmotorpartsret Results and Make Decisions
 ### What to look for
 - Baseline accuracy vs candidate accuracy and the delta.
 - Example from our run: Baseline 50 % (5/10), Candidate 90 % (9/10), delta +40 %.

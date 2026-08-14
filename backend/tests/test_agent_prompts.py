@@ -5,10 +5,10 @@ from agent.middlewares import RequestContextPromptMiddleware
 def test_system_prompt_contains_operating_constraints() -> None:
     prompt = build_system_prompt()
 
-    assert "汽车零部件采购助手" in prompt
-    assert "ERP" in prompt
-    assert "人工审批" in prompt
-    assert "子代理文件交接" in prompt
+    assert "motor-parts procurement assistant" in prompt
+    assert "Motorparts facts" in prompt
+    assert "human-in-the-loop" in prompt
+    assert "When a subagent returns a report" in prompt
     assert "read_file" in prompt
 
 

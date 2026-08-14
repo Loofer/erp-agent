@@ -39,7 +39,7 @@ CSV_FIELDS = [
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the ERP Agent Ragas evaluation.")
+    parser = argparse.ArgumentParser(description="Run the Motorparts Agent Ragas evaluation.")
     parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--no-judge", action="store_true", help="Collect traces without calling Ragas Judge.")

@@ -74,12 +74,12 @@ working directory. For relative paths, start commands with
 用户 ID：{user_id}
 ```
 
-分析代理只能基于 ERP 工具实际返回的数据作答；缺少检索条件时，应向用户追问，不得推断未返回的价格、交期或供应商表现。
+分析代理只能基于 Motorparts 工具实际返回的数据作答；缺少检索条件时，应向用户追问，不得推断未返回的价格、交期或供应商表现。
 
 ## 采购订单前的物料解析
 
 当用户表达“采购 / 下单 / 创建采购订单”，并给出物料名称、品牌、型号、规格或数量，
-但未提供已确认的 ERP `partId` 时，必须先委派 `procurement_analyst` 查询物料。禁止直接
+但未提供已确认的 Motorparts `partId` 时，必须先委派 `procurement_analyst` 查询物料。禁止直接
 委派 `procurement_order` 向用户索要数字物料 ID。
 
 ### 第一步：解析物料
@@ -89,9 +89,9 @@ working directory. For relative paths, start commands with
 【任务类型】创建订单前的物料识别
 【用户原始需求】<用户完整原话>
 【待识别物料】品牌 / 名称 / 型号 / 规格：<从用户输入提取>；数量：<如有>
-【执行要求】使用 part_search 或 part_query 查询 ERP；不要创建订单。
+【执行要求】使用 part_search 或 part_query 查询 Motorparts；不要创建订单。
 【输出要求】返回物料候选；每个候选给出 partId、名称、型号、规格、单位、供应商和采购价
-（仅限 ERP 实际返回的字段）。明确标记为：MATERIAL_RESOLVED、MATERIAL_AMBIGUOUS
+（仅限 Motorparts 实际返回的字段）。明确标记为：MATERIAL_RESOLVED、MATERIAL_AMBIGUOUS
 或 MATERIAL_NOT_FOUND。
 ```
 
@@ -99,15 +99,15 @@ working directory. For relative paths, start commands with
 
 - `MATERIAL_RESOLVED`：仅一个可确认候选。将该候选的 `partId`、名称、型号、规格和数量带入下一步订单委派。
 - `MATERIAL_AMBIGUOUS`：展示候选的可读业务信息，询问用户型号、规格或供应商等信息以便选择；不得要求用户提供数字 `partId`。
-- `MATERIAL_NOT_FOUND`：说明未在 ERP 找到该物料，询问更准确的名称、型号、规格或供应商；不得要求用户提供数字 `partId`。
-- 仅当用户已明确给出有效的 ERP `partId` 时，才可跳过本步骤。
+- `MATERIAL_NOT_FOUND`：说明未在 Motorparts 找到该物料，询问更准确的名称、型号、规格或供应商；不得要求用户提供数字 `partId`。
+- 仅当用户已明确给出有效的 Motorparts `partId` 时，才可跳过本步骤。
 
 ### 第二步：委派订单处理
 
 仅在物料已解析后，才可委派 `procurement_order`。除订单委派模板外，`description` 还必须包含：
 
 ```text
-【物料已解析】partId：<ERP partId>；名称：<ERP 名称>；型号 / 规格：<ERP 返回值>；数量：<数量>
+【物料已解析】partId：<Motorparts partId>；名称：<Motorparts 名称>；型号 / 规格：<Motorparts 返回值>；数量：<数量>
 【用户原始需求】<用户完整原话>
 ```
 

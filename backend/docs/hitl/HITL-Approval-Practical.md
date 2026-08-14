@@ -1,14 +1,14 @@
-# Human-in-the-Loop：让 ERP 写操作在人工确认后才落库
+# Human-in-the-Loop：让 Motorparts 写操作在人工确认后才落库
 
-> 在 ERP 场景中，Agent 能够整理采购订单或供应商资料，并不意味着它应当自行写入系统。Human-in-the-Loop（HITL）的职责是把“已生成可执行请求”和“真正发生业务变更”分开：人确认之前，创建或更新请求绝不能发送。
+> 在 Motorparts 场景中，Agent 能够整理采购订单或供应商资料，并不意味着它应当自行写入系统。Human-in-the-Loop（HITL）的职责是把“已生成可执行请求”和“真正发生业务变更”分开：人确认之前，创建或更新请求绝不能发送。
 
 用户说“帮我创建供应商”，Agent 会提取并校验供应商资料；用户补齐字段后，它可以组装 `supplier_payload`，但 `create_supplier` 仍会在 HTTP 请求前暂停。采购订单的创建和更新同理。这个暂停点既避免了错误写入，也让操作者有机会检查即将提交的参数。
 
-本文说明本项目已经落地的 HITL 链路，并以实际代码和前端行为为准。底层 HITL 还支持 `edit`、`respond` 等决策；当前 ERP 写操作只开放 `approve` 与 `reject`，具体边界见下文。
+本文说明本项目已经落地的 HITL 链路，并以实际代码和前端行为为准。底层 HITL 还支持 `edit`、`respond` 等决策；当前 Motorparts 写操作只开放 `approve` 与 `reject`，具体边界见下文。
 
 ## 一、当前保护的操作
 
-当前系统只对 ERP 状态变更设置审批；查询和草稿收集不会触发写入审批。
+当前系统只对 Motorparts 状态变更设置审批；查询和草稿收集不会触发写入审批。
 
 | 子代理 | 受保护工具 | 实际 HTTP 操作 | 允许决策 | 不需要审批的操作 |
 | --- | --- | --- | --- | --- |
@@ -16,7 +16,7 @@
 | `procurement_order` | `create_order` | `POST /api/orders/create` | `approve`、`reject` | 补充订单字段 |
 | `procurement_order` | `update_order` | `PUT /api/orders/update/{order_id}` | `approve`、`reject` | 无 |
 
-这条边界很重要：审批针对的是会改变 ERP 状态的工具调用，不是针对用户的每一句输入，也不是用 RAG 或提示词替代权限校验。工具本身仍会对请求载荷做收敛处理，例如供应商创建仅保留 API 可写字段，订单工具会移除 `None` 值和只读信息。
+这条边界很重要：审批针对的是会改变 Motorparts 状态的工具调用，不是针对用户的每一句输入，也不是用 RAG 或提示词替代权限校验。工具本身仍会对请求载荷做收敛处理，例如供应商创建仅保留 API 可写字段，订单工具会移除 `None` 值和只读信息。
 
 ## 二、两种“等人”的场景
 
@@ -27,13 +27,13 @@
 | 补充信息 | `request_order_info` / `request_supplier_info` 内部调用 `interrupt()` | 填补缺失或不合法字段 | 原始字符串 | 输入框继续可用，显示追问提示 |
 | 审批写操作 | YAML 的 `interrupt_on` 交给 `HumanInTheLoopMiddleware` | 批准或拒绝一项待执行的工具调用 | `{"decisions": [...]}` | 展示工具参数，输入框替换为批准/取消按钮 |
 
-不要混淆两者。`request_*_info` 是“向人取值”的工具，不调用 ERP；它在恢复后将用户输入作为 `human_response` 返回给 Agent。`create_*` 和 `update_order` 则是有副作用的工具，拒绝时应使用 `reject`，使模型明确知道该写操作没有发生。
+不要混淆两者。`request_*_info` 是“向人取值”的工具，不调用 Motorparts；它在恢复后将用户输入作为 `human_response` 返回给 Agent。`create_*` 和 `update_order` 则是有副作用的工具，拒绝时应使用 `reject`，使模型明确知道该写操作没有发生。
 
 ```text
 缺少字段：用户请求 -> request_*_info -> interrupt -> 用户补充 -> 合并草稿并重新校验
 
 写操作：  校验通过 -> create_* / update_order -> interrupt_on -> 人工审批
-          -> approve -> 调用 ERP HTTP API -> 返回结果
+          -> approve -> 调用 Motorparts HTTP API -> 返回结果
           -> reject  -> 工具不执行，Agent 说明未写入
 ```
 
@@ -75,7 +75,7 @@ interrupt_on:
 
 ## 四、一次创建供应商如何经过系统
 
-以下链路覆盖了从用户输入到 ERP 写入的完整责任划分：
+以下链路覆盖了从用户输入到 Motorparts 写入的完整责任划分：
 
 ```text
 ChatView / Sender
@@ -91,7 +91,7 @@ ChatView / Sender
     -> 工具结果和最终回复
 ```
 
-供应商和订单子代理的系统提示词还要求：调用创建/更新工具后只能说“已提交审批”；只有工具返回成功，才能告知用户数据已经写入 ERP。这样 Agent 的自然语言状态与实际副作用保持一致。
+供应商和订单子代理的系统提示词还要求：调用创建/更新工具后只能说“已提交审批”；只有工具返回成功，才能告知用户数据已经写入 Motorparts。这样 Agent 的自然语言状态与实际副作用保持一致。
 
 ### 1. 原生输入中断保留草稿
 
@@ -157,7 +157,7 @@ human_response = interrupt(
 | `input` | 保留 Sender，显示追问提示，用户可继续输入缺失字段 | 原生工具中断直接提交文本 |
 | `approval` | 隐藏 Sender，显示“批准执行”“取消操作” | 每个待审批 action 对应一条 `approve` 或 `reject` 决策 |
 
-当前界面已提供“补充信息”和“审批写操作”两种交互。对于审批型写操作，[`HitlApprovalBar.vue`](../../../frontend/src/components/HitlApprovalBar.vue) 目前仅提供两个按钮。因此尽管底层 HITL 支持 `edit`、`respond` 等决策，当前 ERP 写操作的审批决策只有 `approve` 与 `reject`；这不影响 `request_*_info` 的自由文本补充。要开放编辑审批，必须同时更新 YAML 的 `allowed_decisions`、前端参数编辑界面和恢复载荷，不能只改其中一处。
+当前界面已提供“补充信息”和“审批写操作”两种交互。对于审批型写操作，[`HitlApprovalBar.vue`](../../../frontend/src/components/HitlApprovalBar.vue) 目前仅提供两个按钮。因此尽管底层 HITL 支持 `edit`、`respond` 等决策，当前 Motorparts 写操作的审批决策只有 `approve` 与 `reject`；这不影响 `request_*_info` 的自由文本补充。要开放编辑审批，必须同时更新 YAML 的 `allowed_decisions`、前端参数编辑界面和恢复载荷，不能只改其中一处。
 
 恢复请求统一发送到：
 
@@ -201,9 +201,9 @@ POST /api/chat/{thread_id}/resume
 | 检查点 | 预期结果 |
 | --- | --- |
 | 缺失供应商或订单字段 | 收到 `input` 中断；恢复文本后草稿会重新校验 |
-| 字段完整但未审批 | 收到 `approval` 中断；ERP 不产生写请求 |
+| 字段完整但未审批 | 收到 `approval` 中断；Motorparts 不产生写请求 |
 | 点击批准 | 使用原 `thread_id` 恢复；只执行对应的创建或更新工具一次 |
-| 点击取消 | 发送 `reject`；ERP 不产生写请求，Agent 明确说明未写入 |
+| 点击取消 | 发送 `reject`；Motorparts 不产生写请求，Agent 明确说明未写入 |
 | 子代理中断冒泡 | 界面只显示一张审批卡，不因命名空间冒泡重复显示 |
 | 重新启动或流结束后恢复 | checkpoint 中仍存在待处理的中断，可继续当前会话 |
 
@@ -215,4 +215,4 @@ uv run pytest -v
 uv run ruff check .
 ```
 
-> 一句话结论：当前 HITL 不是“让 Agent 多问一句”，而是一条可恢复的执行闸门。草稿缺字段时，人提供信息；准备写 ERP 时，人决定是否放行；在 `approve` 到达前，副作用工具不应执行。
+> 一句话结论：当前 HITL 不是“让 Agent 多问一句”，而是一条可恢复的执行闸门。草稿缺字段时，人提供信息；准备写 Motorparts 时，人决定是否放行；在 `approve` 到达前，副作用工具不应执行。

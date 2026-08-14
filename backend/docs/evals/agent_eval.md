@@ -1,8 +1,8 @@
-# ERP Agent Evaluation
+# Motorparts Agent Evaluation
 
 This evaluation runs the production LangGraph Agent orchestration without
 starting FastAPI. It uses the configured Zilliz/Milvus collection for RAG and a
-fixed, read-only ERP fixture for supplier, part, order, and inventory tools.
+fixed, read-only Motorparts fixture for supplier, part, order, and inventory tools.
 
 ## Setup
 
@@ -58,9 +58,9 @@ The CSV and console summary expose six metrics:
 5. `answer_correctness`: answer similarity and factual correctness versus reference.
 6. `tool_correctness`: Jaccard similarity of expected and actual business tools.
 
-`retrieved_contexts` combines Zilliz parent chunks and completed ERP tool
+`retrieved_contexts` combines Zilliz parent chunks and completed Motorparts tool
 results. This lets the same Ragas metrics evaluate knowledge questions and
-read-only ERP questions. Raw RAG IDs, tool names, latency, Agent errors, metric
+read-only Motorparts questions. Raw RAG IDs, tool names, latency, Agent errors, metric
 reasons, and Judge errors are retained for diagnosis.
 
 ## Dataset and isolation
@@ -70,6 +70,6 @@ part, order, inventory, and multi-tool procurement analysis. Add cases to
 `evals/datasets/agent_smoke.json` with an input, reference answer, expected
 tools, required facts, and grading notes.
 
-The ERP fixture rejects every non-GET request. HITL and mutation evaluation are
+The Motorparts fixture rejects every non-GET request. HITL and mutation evaluation are
 out of scope. Zilliz remains live, so RAG scores can change when the collection,
 embedding model, query rewriting, or reranker changes.

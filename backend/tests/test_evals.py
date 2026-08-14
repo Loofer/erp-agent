@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from evals.fixtures.erp import ErpFixture
+from evals.fixtures.motorparts import MotorpartsFixture
 from evals.judge import RAGAS_METRICS, RagasJudge, tool_correctness
 from evals.run import CSV_FIELDS, METRIC_DISPLAY_NAMES
 from evals.runner import extract_trace, load_dataset
@@ -35,9 +35,9 @@ def test_dataset_rejects_duplicate_ids(tmp_path) -> None:
         load_dataset(path)
 
 
-def test_erp_fixture_records_reads_and_rejects_writes() -> None:
-    fixture = ErpFixture()
-    client = httpx.Client(base_url="https://erp.fixture", transport=fixture.transport())
+def test_motorparts_fixture_records_reads_and_rejects_writes() -> None:
+    fixture = MotorpartsFixture()
+    client = httpx.Client(base_url="https://motorparts.fixture", transport=fixture.transport())
 
     response = client.get("/api/parts/search", params={"name": "BP-100"})
     rejected = client.post("/api/orders/create", json={"partId": 1001})
@@ -77,7 +77,7 @@ def test_extract_trace_keeps_parent_answer_tools_and_evidence() -> None:
         },
         {
             "event": "message_chunk",
-            "agent_name": "erp-agent",
+            "agent_name": "motorparts-agent",
             "data": {"content": "需要补货"},
         },
     ]

@@ -2,7 +2,7 @@
 
 > 采购分析需要展示趋势、对比和构成，但图表不应由 Agent 生成图片、HTML 或任意 ECharts 配置。该设计把 Agent 的职责收敛为输出可验证的结构化数据，再由服务端决定如何交给前端渲染。
 
-在采购场景中，Agent 可能已从 ERP 历史订单中算出各供应商的平均采购价。若让它生成 PNG，后端需要处理文件保存、访问路径、清理和安全问题；若让它直接生成 ECharts option，模型又可能输出任意 JavaScript 配置。更可靠的边界是：`execute` 只输出一条 chart JSON，后端只接受预定义字段，前端只消费服务器生成的安全 payload。
+在采购场景中，Agent 可能已从 Motorparts 历史订单中算出各供应商的平均采购价。若让它生成 PNG，后端需要处理文件保存、访问路径、清理和安全问题；若让它直接生成 ECharts option，模型又可能输出任意 JavaScript 配置。更可靠的边界是：`execute` 只输出一条 chart JSON，后端只接受预定义字段，前端只消费服务器生成的安全 payload。
 
 ## 一、Chart 不是报告格式
 
@@ -12,7 +12,7 @@ Chart JSON 只传输可视化所需的数据，不能承载分析过程、报告
 
 | 组件 | 负责 | 不负责 |
 | --- | --- | --- |
-| ERP 工具 | 返回供应商、物料、订单、库存等真实业务数据 | 推断缺失价格、交期或评分 |
+| Motorparts 工具 | 返回供应商、物料、订单、库存等真实业务数据 | 推断缺失价格、交期或评分 |
 | `execute` | 聚合数据，按 NDJSON 输出可选图表 | 生成图片、HTML、报告文件 |
 | `visualization.schema` | 校验 chart JSON 的类型、大小和字段关系 | 计算采购指标 |
 | `visualization.echarts` | 将已验证的规格确定性转换为 ECharts option | 接受模型生成的 option |
@@ -47,7 +47,7 @@ calculation complete
 | `subtitle` | 可选，最长 300 个字符 |
 | `x`、`y` | `bar`、`line`、`pie` 必填；值为 `data` 行中的字段名 |
 | `data` | 最多 500 行；每行最多 30 个字段；坐标类图表每一行都必须拥有 `x`、`y` 指定字段 |
-| `provenance` | 最多 30 项，记录数据来自哪些 ERP 工具，例如 `order_search_details` |
+| `provenance` | 最多 30 项，记录数据来自哪些 Motorparts 工具，例如 `order_search_details` |
 | `warnings` | 最多 30 项，记录样本不足、时间范围不完整等限制 |
 | `chartable` | 默认 `true`；为 `false` 时保留结构化数据，但不请求 ECharts 渲染 |
 
@@ -136,7 +136,7 @@ Chart 契约、验证器和 payload 构造器已经存在，但尚未接入聊�
 
 ## 八、采购分析中如何选择图表
 
-图表应该服务已有 ERP 数据，而不是为了可视化而构造维度。
+图表应该服务已有 Motorparts 数据，而不是为了可视化而构造维度。
 
 | 问题 | 合适类型 | 最小数据条件 | 不适合时的处理 |
 | --- | --- | --- | --- |

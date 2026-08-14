@@ -72,7 +72,7 @@ const conversationMenuConfig: ConversationsProps['menu'] = () => ({
     <!-- 左侧：会话历史侧边栏 -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <span class="logo-title">ERP Agent</span>
+        <span class="logo-title">Motorparts Agent</span>
         <a-button type="text" :icon="h(PlusOutlined)" @click="store.newConversation" title="新建对话" />
       </div>
 
@@ -95,7 +95,7 @@ const conversationMenuConfig: ConversationsProps['menu'] = () => ({
       <div class="messages-area">
         <div v-if="store.messages.length === 0" class="welcome-hint">
           <RobotOutlined class="welcome-icon" />
-          <p>你好！我是 ERP 智能助手，请输入您的问题开始对话。</p>
+          <p>你好！我是 Motorparts 智能助手，请输入您的问题开始对话。</p>
         </div>
 
         <template v-else>

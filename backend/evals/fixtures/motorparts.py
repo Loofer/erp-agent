@@ -1,4 +1,4 @@
-"""Fixed read-only ERP responses for offline agent evaluation."""
+"""Fixed read-only Motorparts responses for offline agent evaluation."""
 
 from __future__ import annotations
 
@@ -27,8 +27,8 @@ _WARNING = {
 
 
 @dataclass
-class ErpFixture:
-    """MockTransport-backed ERP API with request recording."""
+class MotorpartsFixture:
+    """MockTransport-backed Motorparts API with request recording."""
 
     requests: list[dict[str, object]] = field(default_factory=list)
 
@@ -38,7 +38,7 @@ class ErpFixture:
     def client(self) -> object:
         from agent.tools.http_base import ApiClient
 
-        return ApiClient("https://erp.fixture", transport=self.transport())
+        return ApiClient("https://motorparts.fixture", transport=self.transport())
 
     def _handle(self, request: httpx.Request) -> httpx.Response:
         query = dict(request.url.params)

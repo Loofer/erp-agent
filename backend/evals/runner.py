@@ -16,7 +16,7 @@ from agent.main_agent import load_agent_graph
 from agent.rag.runtime import build_hybrid_retriever
 from api_view.chat_service import ChatService
 
-from .fixtures.erp import ErpFixture
+from .fixtures.motorparts import MotorpartsFixture
 from .judge import RAGAS_METRICS, RagasJudge, tool_correctness
 from .rag_recording import RecordingRetriever
 
@@ -65,7 +65,7 @@ def extract_trace(events: list[dict[str, object]]) -> dict[str, object]:
         event_data = data if isinstance(data, dict) else {}
         if (
             event.get("event") == "message_chunk"
-            and event.get("agent_name") == "erp-agent"
+            and event.get("agent_name") == "motorparts-agent"
         ):
             response_chunks.append(str(event_data.get("content", "")))
         if event.get("event") == "tool_call_start":
@@ -94,7 +94,7 @@ async def run_dataset(
     use_judge: bool = True,
 ) -> list[dict[str, Any]]:
     settings = load_settings()
-    fixture = ErpFixture()
+    fixture = MotorpartsFixture()
     client = fixture.client()
     rag_retriever = build_hybrid_retriever(settings)
     if rag_retriever is None:
@@ -140,7 +140,7 @@ async def run_dataset(
             row.update(extract_trace(events))
         except Exception as exc:  # noqa: BLE001
             row["agent_error"] = str(exc)
-        row["erp_requests"] = list(fixture.requests)
+        row["motorparts_requests"] = list(fixture.requests)
         row.update(retriever.snapshot())
         row["retrieved_contexts"] = [
             *row.get("retrieved_contexts", []),

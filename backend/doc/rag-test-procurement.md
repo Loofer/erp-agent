@@ -1,6 +1,6 @@
 # RAG Test Procurement Knowledge
 
-> This document is synthetic test data for validating the ERP RAG pipeline.
+> This document is synthetic test data for validating the Motorparts RAG pipeline.
 
 ## Brake Pad Compatibility
 

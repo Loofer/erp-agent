@@ -8,7 +8,7 @@ planned.
 ## 1. Runtime Shape
 
 The backend is a FastAPI application around one Deep Agents/LangGraph graph.
-The process owns the HTTP transport, graph construction, ERP tool clients, and
+The process owns the HTTP transport, graph construction, Motorparts tool clients, and
 the PostgreSQL resources shared by all requests.
 
 ```text
@@ -23,7 +23,7 @@ FastAPI /api
           |-- optional RAG retrieval
           |-- request context (user, time, retrieved documents)
           `-- LangGraph/Deep Agents graph
-                 |-- primary erp-agent
+                 |-- primary motorparts-agent
                  |     |-- knowledge/RAG tools
                  |     |-- Skills and filesystem backend
                  |     |-- safety middleware
@@ -64,9 +64,9 @@ failure is logged and leaves chat available without retrieval.
 
 `src/agent/main_agent.py` is the composition root. `load_agent_graph()` loads
 the model and YAML definitions, builds the optional RAG retriever, creates the
-ERP `ApiClient`, and calls `deepagents.create_deep_agent()`.
+Motorparts `ApiClient`, and calls `deepagents.create_deep_agent()`.
 
-The primary `erp-agent` receives only parent-level knowledge tools. Domain and
+The primary `motorparts-agent` receives only parent-level knowledge tools. Domain and
 mutation tools are registered in `src/agent/tools/` but are handed to
 subagents through validated YAML files in `src/agent/subagents/configs/`:
 
@@ -74,7 +74,7 @@ subagents through validated YAML files in `src/agent/subagents/configs/`:
 | --- | --- | --- |
 | `supplier_manager` | supplier search and supplier workflow | `create_supplier` |
 | `procurement_order` | order fields and order mutations | `create_order`, `update_order` |
-| `procurement_analyst` | ERP aggregation, analysis, and chart/report output | none |
+| `procurement_analyst` | Motorparts aggregation, analysis, and chart/report output | none |
 
 `loader.py` validates names, prompts, tool references, skills, backend type, and
 `interrupt_on` decisions before constructing `SubAgent` values. A write tool is
@@ -102,7 +102,7 @@ The registered middleware stack currently includes:
   and API-key patterns according to each configured policy.
 
 Retrieved text is evidence, not an instruction. Current inventory, prices,
-orders, and other live ERP facts must come from registered ERP tools; RAG is for
+orders, and other live Motorparts facts must come from registered Motorparts tools; RAG is for
 document knowledge and workflow guidance.
 
 ## 5. Filesystem and Memory Backends
@@ -160,7 +160,7 @@ when to write a longer report to `/analysis/`.
 
 ## 8. Evaluation and Operations
 
-`backend/evals/` runs the production graph with a read-only ERP mock transport,
+`backend/evals/` runs the production graph with a read-only Motorparts mock transport,
 records retrieval and tool traces, and optionally evaluates RAGAS metrics plus
 deterministic tool correctness. It is an offline regression harness, not a
 production monitoring service.

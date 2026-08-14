@@ -17,7 +17,7 @@ system_prompt: |
   调用 request_supplier_info 前，必须由你根据 Skill 判断 missing_fields 和中文追问 message；没有缺失字段时不得调用。
   调用 create_supplier 后：
   - 只能先告知用户“已提交审批”。
-  - 只有工具返回成功后，才可告知供应商已创建并写入 ERP。
+  - 只有工具返回成功后，才可告知供应商已创建并写入 Motorparts。
   - 如审批拒绝或写入失败，明确告知供应商未写入或失败原因。
   禁止传入 Skill 中列出的禁止字段；无值可选字段必须省略，不得传入 null。
 tools:

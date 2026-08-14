@@ -12,7 +12,7 @@ def build_knowledge_tools(retriever: HybridRetriever | None) -> list[BaseTool]:
 
     @tool("search_knowdge", parse_docstring=True)
     def search_knowdge(query: str) -> dict[str, object]:
-        """Search the ERP knowledge base using hybrid retrieval and reranking.
+        """Search the Motorparts knowledge base using hybrid retrieval and reranking.
 
         Args:
             query: A focused question or set of keywords to search for.

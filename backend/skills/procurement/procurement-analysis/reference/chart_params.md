@@ -25,7 +25,7 @@ Do not add backslashes before quotes in Python expressions. Write `row['supplier
 | `table` | `id`, `title`, `data` | Detailed rows or chart fallback |
 | `kpi` | `id`, `title`, `data` | Headline metrics |
 
-For `bar`, `line`, and `pie`, every data row must contain the fields named by `x` and `y`. Keep each chart at 500 rows or fewer. Include the ERP tool names in `provenance`; put data limitations in `warnings`. Emit at most 12 charts per document.
+For `bar`, `line`, and `pie`, every data row must contain the fields named by `x` and `y`. Keep each chart at 500 rows or fewer. Include the Motorparts tool names in `provenance`; put data limitations in `warnings`. Emit at most 12 charts per document.
 
 Do not emit unsupported chart types. Omit a chart when the data cannot support it and explain the limitation in the Agent's response or report.
 

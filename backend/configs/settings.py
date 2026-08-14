@@ -67,7 +67,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("LANGSMITH_API_KEY", "langsmith_api_key"),
     )
     langsmith_project: str = Field(
-        default="erp-agent",
+        default="motorparts-agent",
         validation_alias=AliasChoices("LANGSMITH_PROJECT", "langsmith_project"),
     )
     zilliz_uri: str = Field(

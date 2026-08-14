@@ -6,7 +6,7 @@ from .http_base import ApiClient
 
 
 def _search_parts_request(client: ApiClient, name: str) -> dict[str, object]:
-    """Search parts by name through the shared ERP client."""
+    """Search parts by name through the shared Motorparts client."""
     return client.get("/api/parts/search", query={"name": name})
 
 
@@ -28,7 +28,7 @@ def build_part_tools(client: ApiClient) -> list[BaseTool]:
             name: Full or partial part name to search for.
 
         Returns:
-            ERP response wrapper with `code` (business status code), `message`
+            Motorparts response wrapper with `code` (business status code), `message`
             (status text), `timestamp` (response epoch milliseconds), and `data`.
             `data` is a list of parts. Each part contains `id`, `partCode`, `name`,
             `model`, `specification`, `unit`, `purchasePrice`,
@@ -45,7 +45,7 @@ def build_part_tools(client: ApiClient) -> list[BaseTool]:
             name: Full or partial part name to search for.
 
         Returns:
-            ERP response wrapper with `code` (business status code), `message`
+            Motorparts response wrapper with `code` (business status code), `message`
             (status text), `timestamp` (response epoch milliseconds), and `data`.
             `data` is a list of parts. Each part contains `id`, `partCode`, `name`,
             `model`, `specification`, `unit`, `purchasePrice`,
@@ -56,13 +56,13 @@ def build_part_tools(client: ApiClient) -> list[BaseTool]:
 
     @tool(parse_docstring=True)
     def part_by_supplier(supplier_id: int) -> dict[str, object]:
-        """List all parts provided by an ERP supplier.
+        """List all parts provided by an Motorparts supplier.
 
         Args:
-            supplier_id: ERP identifier of the supplier.
+            supplier_id: Motorparts identifier of the supplier.
 
         Returns:
-            ERP response wrapper with `code` (business status code), `message`
+            Motorparts response wrapper with `code` (business status code), `message`
             (status text), `timestamp` (response epoch milliseconds), and `data`.
             `data` is the supplier's list of parts. Each part contains `id`,
             `partCode`, `name`, `model`, `specification`, `unit`, `purchasePrice`,

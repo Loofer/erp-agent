@@ -6,7 +6,7 @@ from .http_base import ApiClient
 
 
 def _inventory_warning_request(client: ApiClient) -> dict[str, object]:
-    """Fetch low-stock inventory warnings through the shared ERP client."""
+    """Fetch low-stock inventory warnings through the shared Motorparts client."""
     return client.get("/api/inventory/warning")
 
 
@@ -18,7 +18,7 @@ def build_inventory_tools(client: ApiClient) -> list[BaseTool]:
         """List inventory records at or below their safety-stock threshold.
 
         Returns:
-            ERP response wrapper with `code` (business status code), `message`
+            Motorparts response wrapper with `code` (business status code), `message`
             (status text), `timestamp` (response epoch milliseconds), and `data`.
             `data` is a list of warning records. Each record contains `id`,
             `partId`, `currentQuantity`, `safetyStock`, `lastInboundTime`,

@@ -13,7 +13,7 @@ class ApiClientError(RuntimeError):
 
 
 class ApiClient:
-    """Send requests to the configured ERP API."""
+    """Send requests to the configured Motorparts API."""
 
     def __init__(
         self,
@@ -55,7 +55,7 @@ class ApiClient:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             raw_body = exc.response.text
-            _log.error("ERP %s returned HTTP %s: %s", operation, exc.response.status_code, raw_body)
+            _log.error("Motorparts %s returned HTTP %s: %s", operation, exc.response.status_code, raw_body)
             raise ApiClientError(
                 f"Request for {operation} failed with HTTP {exc.response.status_code}: "
                 f"{raw_body}"
@@ -64,16 +64,16 @@ class ApiClient:
         try:
             payload: Any = response.json()
         except ValueError as exc:
-            _log.error("ERP %s returned a non-JSON body: %s", operation, response.text)
+            _log.error("Motorparts %s returned a non-JSON body: %s", operation, response.text)
             raise ApiClientError(
                 f"Response for {operation} was not JSON: {response.text}"
             ) from exc
         if not isinstance(payload, dict):
-            _log.error("ERP %s returned a non-object body: %s", operation, response.text)
+            _log.error("Motorparts %s returned a non-object body: %s", operation, response.text)
             raise ApiClientError(f"Response for {operation} was not an object.")
         code = payload.get("code")
         if isinstance(code, int) and code >= 400:
-            _log.error("ERP %s returned error code %s: %s", operation, code, response.text)
+            _log.error("Motorparts %s returned error code %s: %s", operation, code, response.text)
             raise ApiClientError(
                 f"API operation {operation} failed with code {code}: {response.text}"
             )

@@ -6,12 +6,12 @@ from agent.tools.http_base import ApiClient, ApiClientError
 
 def test_api_client_sends_configured_bearer_token() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.headers["Authorization"] == "Bearer erp-secret"
+        assert request.headers["Authorization"] == "Bearer motorparts-secret"
         return httpx.Response(200, json={"code": 200, "data": {}})
 
     client = ApiClient(
         "https://motorparts.test",
-        api_token="erp-secret",
+        api_token="motorparts-secret",
         transport=httpx.MockTransport(handler),
     )
 
@@ -64,7 +64,7 @@ def test_request_rejects_non_object_responses() -> None:
         client.get("/api/statistics/dashboard")
 
 
-def test_request_logs_raw_erp_error_response(caplog: pytest.LogCaptureFixture) -> None:
+def test_request_logs_raw_motorparts_error_response(caplog: pytest.LogCaptureFixture) -> None:
     client = ApiClient(
         "https://motorparts.test",
         transport=httpx.MockTransport(
@@ -75,4 +75,4 @@ def test_request_logs_raw_erp_error_response(caplog: pytest.LogCaptureFixture) -
     with pytest.raises(ApiClientError, match="invalid part"):
         client.post("/api/orders/create", {"orderNumber": "PO-001"})
 
-    assert 'ERP POST /api/orders/create returned HTTP 400: {"message":"invalid part"}' in caplog.text
+    assert 'Motorparts POST /api/orders/create returned HTTP 400: {"message":"invalid part"}' in caplog.text

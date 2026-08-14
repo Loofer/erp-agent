@@ -5,7 +5,7 @@
 `motorparts-agent` is a motor-parts procurement assistant backend. It exposes a
 streaming chat API (FastAPI + SSE) and runs an AI agent powered by the
 **Deep Agents** framework on top of **LangGraph**. The agent connects to a
-remote ERP API for procurement data and supports human-in-the-loop (HITL)
+remote Motorparts API for procurement data and supports human-in-the-loop (HITL)
 approval flows for state-changing actions.
 
 All persistence (LangGraph checkpoints, conversation metadata, long-term agent
@@ -54,7 +54,7 @@ backend/
 │   │   │       └── supplier_manager.yaml
 │   │   ├── tools/
 │   │   │   ├── __init__.py       # build_parent_tools(), build_subagent_only_tools()
-│   │   │   ├── http_base.py      # ApiClient — all ERP HTTP calls go here
+│   │   │   ├── http_base.py      # ApiClient — all Motorparts HTTP calls go here
 │   │   │   ├── hitl_tools.py     # Human-in-the-loop tool stubs
 │   │   │   ├── statistics_tools.py
 │   │   │   ├── suppliers_tools.py
@@ -98,8 +98,8 @@ Copy `.env.example` to `.env` and fill in the required values.
 | `MOTORPARTS_MODEL_API_KEY` | **yes** | — | LLM API key |
 | `MOTORPARTS_MODEL_BASE_URL` | yes* | `""` | Base URL for OpenAI-compatible endpoint |
 | `MOTORPARTS_AGENT_MODEL` | no | `openai:gpt-4.1-mini` | Model name in `provider:model` format |
-| `MOTORPARTS_API_BASE_URL` | no | `http://47.92.108.163:8081` | ERP backend API base URL |
-| `MOTORPARTS_API_TOKEN` | no | `None` | Bearer token for the ERP API (empty = no auth) |
+| `MOTORPARTS_API_BASE_URL` | no | `http://47.92.108.163:8081` | Motorparts backend API base URL |
+| `MOTORPARTS_API_TOKEN` | no | `None` | Bearer token for the Motorparts API (empty = no auth) |
 | `MOTORPARTS_AGENT_ID` | no | `motorparts-agent` | Scopes persistent memory and conversation records |
 | `DEBUG_ENABLED` | no | `False` | Enables Deep Agents debug logging |
 
@@ -239,7 +239,7 @@ committed. They are exposed read-only to the agent via the `/skills/` backend ro
 ## Key Conventions
 
 - **Settings**: always read via `load_settings()` — never access `os.environ` directly.
-- **HTTP**: all ERP API calls go through `ApiClient.execute()`. Never use `httpx` directly in tool code.
+- **HTTP**: all Motorparts API calls go through `ApiClient.execute()`. Never use `httpx` directly in tool code.
 - **Mutations**: only `create_supplier` is an active mutation. Any new mutation requires an explicit HITL `interrupt_on` rule in the subagent YAML.
 - **Subagents**: add to `subagents/configs/` as a new YAML file. The loader auto-discovers all `*.yaml` files in that directory.
 - **Tool naming**: tool names in YAML must exactly match the `name` attribute on the `@tool`-decorated function.

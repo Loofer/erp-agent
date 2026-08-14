@@ -21,7 +21,7 @@ class FakeGraph:
             "ns": [],
             "data": (
                 {"type": "ai", "role": "assistant", "content": "Approved"},
-                {"langgraph_node": "model", "lc_agent_name": "erp-agent"},
+                {"langgraph_node": "model", "lc_agent_name": "motorparts-agent"},
             ),
         }
 
@@ -126,7 +126,7 @@ class ParentAndSubagentGraph(FakeGraph):
             "ns": [],
             "data": (
                 {"type": "ai", "content": "final answer"},
-                {"langgraph_node": "model", "lc_agent_name": "erp-agent"},
+                {"langgraph_node": "model", "lc_agent_name": "motorparts-agent"},
             ),
         }
 
@@ -152,7 +152,7 @@ async def test_stream_preserves_parent_and_subagent_identity() -> None:
     assert chunks[0]["agent_name"] == "supplier_manager"
     assert chunks[0]["data"]["content"] == "internal result"
     assert chunks[1]["namespace"] == []
-    assert chunks[1]["agent_name"] == "erp-agent"
+    assert chunks[1]["agent_name"] == "motorparts-agent"
     assert chunks[1]["data"]["content"] == "final answer"
 
 
@@ -200,7 +200,7 @@ def test_semantic_events_distinguish_routing_from_tool_calls() -> None:
     task = AIMessage(
         content="",
         id="ai-routing",
-        name="erp-agent",
+        name="motorparts-agent",
         tool_calls=[
             {
                 "id": "call-task",

@@ -1,7 +1,7 @@
 # Motorparts Agent
 
 <p align="center">
-  <strong>An AI agent harness for motor-parts ERP procurement workflows</strong><br />
+  <strong>An AI agent harness for motor-parts Motorparts procurement workflows</strong><br />
   Reliable tool use, contextual retrieval, human approval, and resumable execution.
 </p>
 
@@ -12,7 +12,7 @@
 
 Motorparts Agent is an open-source engineering project that applies Harness
 Engineering ideas to a concrete procurement domain. It combines a Deep Agents
-runtime with LangGraph, ERP tools, specialised subagents, PostgreSQL-backed
+runtime with LangGraph, Motorparts tools, specialised subagents, PostgreSQL-backed
 state, hybrid RAG, safety middleware, and an evaluation runner.
 
 The project is intentionally focused on the runtime around an LLM: how an agent
@@ -57,8 +57,8 @@ continues from durable state.
   namespace and frontend contract. Resume requests accept either free-text tool
   input or structured approval decisions.
 - **Human approval for writes** — supplier and procurement-order creation or
-  updates pause through `interrupt_on` before the ERP HTTP request. Only an
-  approval submits the mutation; rejection explicitly leaves ERP state intact.
+  updates pause through `interrupt_on` before the Motorparts HTTP request. Only an
+  approval submits the mutation; rejection explicitly leaves Motorparts state intact.
   See [`HITL-Approval-Practical.md`](backend/docs/hitl/HITL-Approval-Practical.md).
 
 ### Context Engineering and Memory
@@ -88,9 +88,9 @@ continues from durable state.
 
 ### Tools, Files, and Skills
 
-- **Bounded ERP tools** — typed registered tools use a shared HTTP client for
+- **Bounded Motorparts tools** — typed registered tools use a shared HTTP client for
   suppliers, parts, orders, inventory, logistics, customers, BI, and knowledge
-  retrieval. The system prompt requires ERP facts to come from these tools.
+  retrieval. The system prompt requires Motorparts facts to come from these tools.
 - **Large-result offloading** — the Deep Agents filesystem middleware evicts
   oversized tool results to files and returns a compact reference; agents can
   inspect the full result incrementally with `read_file` and offsets.
@@ -138,14 +138,14 @@ continues from durable state.
 
 ### Evaluation
 
-- **Offline agent evaluation** — a labelled ERP-agent dataset drives the
-  production graph with mocked ERP fixtures while recording final answers,
+- **Offline agent evaluation** — a labelled Motorparts Agent dataset drives the
+  production graph with mocked Motorparts fixtures while recording final answers,
   selected tools, retrieved contexts, tool evidence, errors, and latency.
 - **RAGAS quality metrics** — faithfulness, answer relevancy, context precision,
   context recall, and answer correctness are scored by an optional LLM judge;
   tool correctness is calculated separately from expected and observed tools.
 - **Diagnostic regression evaluation** — evaluations reuse the production agent
-  orchestration with read-only ERP fixtures, retaining answers, retrieval
+  orchestration with read-only Motorparts fixtures, retaining answers, retrieval
   evidence, tool traces, errors, and latency to distinguish retrieval, tool
   selection, and generation failures. See [`Ragas-Agent-Evaluation-Practical.md`](backend/docs/evals/Ragas-Agent-Evaluation-Practical.md).
 
@@ -163,13 +163,13 @@ hybrid RAG, and offline evaluation.
 ### Procurement Analysis
 
 The primary agent receives a procurement question, delegates specialised work
-when appropriate, retrieves ERP or knowledge-base evidence, and streams a
+when appropriate, retrieves Motorparts or knowledge-base evidence, and streams a
 grounded response. Structured chart data can be rendered by the frontend.
 
 ### Information Collection and Approval
 
 An order or supplier subagent either asks for missing fields or prepares a
-mutation. LangGraph pauses before the ERP request, the UI collects a response or
+mutation. LangGraph pauses before the Motorparts request, the UI collects a response or
 decision, and the same thread resumes from its PostgreSQL checkpoint.
 
 ### Retrieval-Augmented Assistance
@@ -234,7 +234,7 @@ and HITL approval flow will be added here.
 - [`backend/ARCH.md`](backend/ARCH.md)  Backend architecture notes.
 - [`backend/docs/chart-render/Chart-Output-Practical.md`](backend/docs/chart-render/Chart-Output-Practical.md)  Controlled chart-data contract and frontend rendering boundary.
 - [`backend/docs/evals/Ragas-Agent-Evaluation-Practical.md`](backend/docs/evals/Ragas-Agent-Evaluation-Practical.md)  RAGAS metrics, tool correctness, and regression diagnosis.
-- [`backend/docs/hitl/HITL-Approval-Practical.md`](backend/docs/hitl/HITL-Approval-Practical.md)  ERP write interruption, approval, and resume flow.
+- [`backend/docs/hitl/HITL-Approval-Practical.md`](backend/docs/hitl/HITL-Approval-Practical.md)  Motorparts write interruption, approval, and resume flow.
 - [`backend/docs/memory/Filesystem-Permission-Practical.md`](backend/docs/memory/Filesystem-Permission-Practical.md)  Permission boundaries for Deep Agents built-in filesystem tools.
 - [`backend/docs/memory/Memory-Practical.md`](backend/docs/memory/Memory-Practical.md)  Conversation summaries, durable user memory, and isolation.
 - [`backend/docs/memory/Sandbox-Practical.md`](backend/docs/memory/Sandbox-Practical.md)  `execute` isolation and AIO Sandbox migration design.

@@ -14,7 +14,7 @@ def _create_supplier_request(
     return client.post("/api/suppliers/create", supplier_payload)
 
 
-def _erp_supplier_payload(supplier_payload: dict[str, Any]) -> dict[str, Any]:
+def _motorparts_supplier_payload(supplier_payload: dict[str, Any]) -> dict[str, Any]:
     """Keep only API-writable supplier fields and omit absent optional values."""
     writable_fields = (
         "supplierCode",
@@ -47,12 +47,12 @@ def build_supplier_tools(client: ApiClient) -> list[BaseTool]:
         Args:
             supplier_payload: Validated supplier data. It may include only
                 supplierCode, name, contactPerson, phone, email, address, and
-                creditRating. ERP-managed fields such as status are ignored.
+                creditRating. Motorparts-managed fields such as status are ignored.
 
         Returns:
             The API response for the approved supplier creation request.
         """
-        payload = _erp_supplier_payload(supplier_payload)
+        payload = _motorparts_supplier_payload(supplier_payload)
         return _create_supplier_request(client, payload)
 
     @tool(parse_docstring=True)
@@ -63,7 +63,7 @@ def build_supplier_tools(client: ApiClient) -> list[BaseTool]:
             name: Full or partial supplier name to search for.
 
         Returns:
-            ERP response wrapper with `code` (business status code), `message`
+            Motorparts response wrapper with `code` (business status code), `message`
             (status text), `timestamp` (response epoch milliseconds), and `data`.
             `data` is a list of matching suppliers. Each supplier contains `id`,
             `supplierCode`, `name`, `contactPerson`, `phone`, `email`, `address`,
@@ -79,7 +79,7 @@ def build_supplier_tools(client: ApiClient) -> list[BaseTool]:
             name: Full or partial supplier name to search for.
 
         Returns:
-            ERP response wrapper with `code` (business status code), `message`
+            Motorparts response wrapper with `code` (business status code), `message`
             (status text), `timestamp` (response epoch milliseconds), and `data`.
             `data` is a list of matching suppliers. Each supplier contains `id`,
             `supplierCode`, `name`, `contactPerson`, `phone`, `email`, `address`,

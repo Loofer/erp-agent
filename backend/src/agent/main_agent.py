@@ -95,7 +95,7 @@ def _create_main_agent(
     )
     return deepagents.create_deep_agent(
         model=model,
-        name="erp-agent",
+        name="motorparts-agent",
         tools=parent_tools,
         system_prompt=build_system_prompt(),
         subagents=deep_agent_subagents,

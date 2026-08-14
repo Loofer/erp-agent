@@ -1,7 +1,7 @@
 # Motorparts Agent
 
 <p align="center">
-  <strong>面向汽车零部件 ERP 采购工作流的 AI Agent Harness</strong><br />
+  <strong>面向汽车零部件 Motorparts 采购工作流的 AI Agent Harness</strong><br />
   可靠工具调用、上下文检索、人工审批与可恢复执行。
 </p>
 
@@ -10,7 +10,7 @@
   <a href="LICENSE">MIT License</a>
 </p>
 
-Motorparts Agent 是一个开源工程项目，将 Harness Engineering 思路应用于具体的采购领域。项目组合了 Deep Agents 与 LangGraph 运行时、ERP 工具、专项子代理、PostgreSQL 状态、混合 RAG、安全中间件和评测运行器。
+Motorparts Agent 是一个开源工程项目，将 Harness Engineering 思路应用于具体的采购领域。项目组合了 Deep Agents 与 LangGraph 运行时、Motorparts 工具、专项子代理、PostgreSQL 状态、混合 RAG、安全中间件和评测运行器。
 
 项目有意聚焦于 LLM 周围的运行时工程：Agent 如何获得可信上下文、使用受限工具、在关键决策前暂停，并从持久化状态继续执行。
 
@@ -31,7 +31,7 @@ Motorparts Agent 是一个开源工程项目，将 Harness Engineering 思路应
 - **声明式子代理**：采购分析、采购订单和供应商管理代理均由经过校验的 YAML 定义加载。每份定义独立拥有提示词、工具白名单、附加 Skills 和 HITL 规则。
 - **规划与任务控制**：Deep Agents Harness 为多步骤计划提供 `write_todos`，并内置 `read_file`、`write_file`、`edit_file`、目录列举、搜索和 glob 等文件系统操作。
 - **可恢复执行**：LangGraph 中断保留精确的 checkpoint 命名空间和前端契约。恢复请求可接受自由文本工具输入或结构化审批决定。
-- **写操作人工审批**：供应商与采购订单的创建、更新在 ERP HTTP 请求前由 `interrupt_on` 暂停，只有批准才会提交，拒绝会明确保留未写入状态。详见 [`HITL-Approval-Practical.md`](backend/docs/hitl/HITL-Approval-Practical.md)。
+- **写操作人工审批**：供应商与采购订单的创建、更新在 Motorparts HTTP 请求前由 `interrupt_on` 暂停，只有批准才会提交，拒绝会明确保留未写入状态。详见 [`HITL-Approval-Practical.md`](backend/docs/hitl/HITL-Approval-Practical.md)。
 
 ### 上下文工程与记忆
 
@@ -44,7 +44,7 @@ Motorparts Agent 是一个开源工程项目，将 Harness Engineering 思路应
 
 ### 工具、文件与 Skills
 
-- **受边界限制的 ERP 工具**：类型化注册工具通过共享 HTTP 客户端处理供应商、物料、订单、库存、物流、客户、BI 和知识检索。系统提示词要求 ERP 事实必须来自这些工具。
+- **受边界限制的 Motorparts 工具**：类型化注册工具通过共享 HTTP 客户端处理供应商、物料、订单、库存、物流、客户、BI 和知识检索。系统提示词要求 Motorparts 事实必须来自这些工具。
 - **大结果落盘**：Deep Agents 文件系统中间件会将超大的工具结果逐出到文件，并返回精简引用；Agent 可通过带 offset 的 `read_file` 分段读取完整结果。
 - **结构化报告交付**：采购分析 Skill 会在可视化前读取图表契约，并将复杂报告写入文件，向父 Agent 返回简洁摘要和文件路径供其回读。
 - **渐进式披露 Skills**：版本化 `SKILL.md` 指令挂载于 `/skills/`；静态 Skills 和策略指南禁止写入，`/memories/` 下的用户记忆允许写入。
@@ -65,9 +65,9 @@ Motorparts Agent 是一个开源工程项目，将 Harness Engineering 思路应
 
 ### 评测
 
-- **离线 Agent 评测**：带标签的 ERP Agent 数据集通过 Mock ERP fixture 驱动生产图，记录最终回答、工具选择、检索上下文、工具证据、错误和延迟。
+- **离线 Agent 评测**：带标签的 Motorparts Agent 数据集通过 Mock Motorparts fixture 驱动生产图，记录最终回答、工具选择、检索上下文、工具证据、错误和延迟。
 - **RAGAS 质量指标**：可选 LLM Judge 评分忠实度、回答相关性、上下文精确率、上下文召回率和回答正确性；工具正确性则根据预期与实际工具独立计算。
-- **可诊断回归评测**：评测复用生产 Agent 编排与只读 ERP fixture，同时保留回答、检索证据、工具轨迹、错误和延迟，帮助区分召回、工具选择与生成问题。详见 [`Ragas-Agent-Evaluation-Practical.md`](backend/docs/evals/Ragas-Agent-Evaluation-Practical.md)。
+- **可诊断回归评测**：评测复用生产 Agent 编排与只读 Motorparts fixture，同时保留回答、检索证据、工具轨迹、错误和延迟，帮助区分召回、工具选择与生成问题。详见 [`Ragas-Agent-Evaluation-Practical.md`](backend/docs/evals/Ragas-Agent-Evaluation-Practical.md)。
 
 ## 系统架构
 
@@ -79,11 +79,11 @@ Motorparts Agent 是一个开源工程项目，将 Harness Engineering 思路应
 
 ### 采购分析
 
-主 Agent 接收采购问题，按需委派专项工作，检索 ERP 或知识库证据，并流式返回有依据的回答。结构化图表数据可由前端渲染。
+主 Agent 接收采购问题，按需委派专项工作，检索 Motorparts 或知识库证据，并流式返回有依据的回答。结构化图表数据可由前端渲染。
 
 ### 信息收集与审批
 
-订单或供应商子代理会请求缺失字段，或准备一个变更操作。LangGraph 在发送 ERP 请求前暂停，界面收集信息或决定后，同一线程从 PostgreSQL checkpoint 恢复。
+订单或供应商子代理会请求缺失字段，或准备一个变更操作。LangGraph 在发送 Motorparts 请求前暂停，界面收集信息或决定后，同一线程从 PostgreSQL checkpoint 恢复。
 
 ### 检索增强协助
 
@@ -142,7 +142,7 @@ pnpm dev
 - [`backend/ARCH.md`](backend/ARCH.md)  后端架构说明。
 - [`backend/docs/chart-render/Chart-Output-Practical.md`](backend/docs/chart-render/Chart-Output-Practical.md)  受控图表数据契约与前端渲染边界。
 - [`backend/docs/evals/Ragas-Agent-Evaluation-Practical.md`](backend/docs/evals/Ragas-Agent-Evaluation-Practical.md)  RAGAS 指标、工具正确性与回归诊断。
-- [`backend/docs/hitl/HITL-Approval-Practical.md`](backend/docs/hitl/HITL-Approval-Practical.md)  ERP 写操作的中断、审批与恢复链路。
+- [`backend/docs/hitl/HITL-Approval-Practical.md`](backend/docs/hitl/HITL-Approval-Practical.md)  Motorparts 写操作的中断、审批与恢复链路。
 - [`backend/docs/memory/Filesystem-Permission-Practical.md`](backend/docs/memory/Filesystem-Permission-Practical.md)  Deep Agents 内置文件工具的权限边界。
 - [`backend/docs/memory/Memory-Practical.md`](backend/docs/memory/Memory-Practical.md)  会话摘要、长期用户记忆与隔离策略。
 - [`backend/docs/memory/Sandbox-Practical.md`](backend/docs/memory/Sandbox-Practical.md)  `execute` 执行隔离与 AIO Sandbox 迁移设计。
