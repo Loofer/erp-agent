@@ -2,7 +2,6 @@
 name = "motorparts-agent"
 version = "0.1.0"
 description = "Motor‑parts procurement agent backend skeleton"
-readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "deepagents==0.7.5",
