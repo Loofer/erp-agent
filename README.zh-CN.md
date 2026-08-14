@@ -114,10 +114,18 @@ Motorparts Agent 是一个开源工程项目，将 Harness Engineering 思路应
 ```powershell
 cd backend
 Copy-Item .env.example .env
-# 在 .env 中配置 DATABASE_URL 和 MOTORPARTS_MODEL_API_KEY。
+# 在 .env 中配置数据库、模型和 Motorparts API 的核心参数（见下文）。
 uv sync
 uv run uvicorn src.api_view.web_main:app --reload --port 8000
 ```
+
+至少需要填写 `DATABASE_URL`、`MOTORPARTS_MODEL_BASE_URL`、
+`MOTORPARTS_MODEL_API_KEY`、`MOTORPARTS_AGENT_MODEL` 和
+`MOTORPARTS_API_BASE_URL`。如果 Motorparts 服务要求鉴权，还需填写
+`MOTORPARTS_API_TOKEN`。启用混合 RAG 时，应同时配置 `ZILLIZ_URI`、
+`ZILLIZ_TOKEN` 和 `MILVUS_COLLECTION`。由于 `.env.example` 默认启用
+LangSmith 追踪，还需填写 `LANGSMITH_API_KEY`，或将
+`LANGSMITH_TRACING` 设置为 `false`。
 
 后端将运行在 `http://localhost:8000`。混合 RAG 为可选能力；配置 Milvus/Zilliz 连接参数后启用。
 
@@ -152,6 +160,7 @@ pnpm dev
 
 ## 路线图
 
+- 前端后续重构并迁移至 [assistant-ui](https://github.com/assistant-ui/assistant-ui)，利用其对 LangChain 和 LangGraph 的原生支持，更好地衔接后端 Agent 运行时。
 - 生产级认证和授权。
 - LangSmith 链路追踪、运行监控和成本可见性。
 - 容器化部署与环境编排。

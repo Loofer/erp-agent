@@ -203,10 +203,18 @@ and delimited with source identifiers before entering the model context.
 ```powershell
 cd backend
 Copy-Item .env.example .env
-# Configure DATABASE_URL and MOTORPARTS_MODEL_API_KEY in .env.
+# Configure the core database, model, and Motorparts API values in .env (see below).
 uv sync
 uv run uvicorn src.api_view.web_main:app --reload --port 8000
 ```
+
+At minimum, set `DATABASE_URL`, `MOTORPARTS_MODEL_BASE_URL`,
+`MOTORPARTS_MODEL_API_KEY`, `MOTORPARTS_AGENT_MODEL`, and
+`MOTORPARTS_API_BASE_URL`. Set `MOTORPARTS_API_TOKEN` when the Motorparts
+service requires authentication. To use hybrid RAG, configure `ZILLIZ_URI`,
+`ZILLIZ_TOKEN`, and `MILVUS_COLLECTION` together. Because `.env.example`
+enables LangSmith tracing, also provide `LANGSMITH_API_KEY` or set
+`LANGSMITH_TRACING=false`.
 
 The backend starts on `http://localhost:8000`. Hybrid RAG is optional and is
 enabled when the Milvus/Zilliz connection settings are configured.
@@ -244,6 +252,7 @@ and HITL approval flow will be added here.
 
 ## Roadmap
 
+- Refactor and migrate the frontend to [assistant-ui](https://github.com/assistant-ui/assistant-ui), whose native LangChain and LangGraph support better aligns with the backend runtime.
 - Production-grade authentication and authorization.
 - LangSmith tracing, operational monitoring, and cost visibility.
 - Containerized deployment and environment orchestration.

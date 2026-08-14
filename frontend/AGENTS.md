@@ -38,7 +38,11 @@ frontend/
 │   ├── views/
 │   │   └── ChatView.vue     # Main chat page (Bubble + Conversations + Sender)
 │   ├── components/
-│   │   └── HelloWorld.vue   # Placeholder component (can be replaced)
+│   │   ├── MessageBubble.vue       # Markdown-safe user/assistant messages
+│   │   ├── ToolCallSteps.vue       # Tool and routing timeline
+│   │   ├── InterruptCard.vue       # Input/approval interruption details
+│   │   ├── HitlApprovalBar.vue     # Approve/reject controls
+│   │   └── analysis/ChartCard.vue  # Validated chart rendering
 │   ├── router/
 │   │   └── index.ts         # Vue Router config
 │   ├── assets/              # Static assets (images, SVG)
@@ -119,6 +123,7 @@ The single Pinia store `useChatStore` owns all chat state:
 | `conversations` | `ConversationItem[]` | Sidebar conversation list |
 | `currentThreadId` | `string \| null` | Active LangGraph thread ID |
 | `loading` | `boolean` | `true` while streaming |
+| `pendingInterrupt` | `InterruptData \| null` | Current input or approval HITL pause |
 
 Key actions:
 
@@ -166,7 +171,7 @@ uses `fetch` + `ReadableStream` for full control). Callbacks:
 | `message_chunk` | `{ content }` | ✅ appends text to assistant bubble |
 | `complete` | `{ thread_id }` | ✅ calls `onDone` |
 | `error` | `{ error }` | ✅ calls `onError` |
-| `interrupt` | `{ thread_id, ... }` | ⚠️ currently ignored — needs HITL UI |
+| `interrupt` | `{ thread_id, ... }` | ✅ renders input or approval controls |
 
 `content` in `message_chunk` may be a `string` **or** a `ContentBlock[]` array
 (LangGraph multimodal format). The parser handles both.
@@ -228,17 +233,17 @@ backend, or configure a reverse proxy so `/api` routes hit the backend.
   production, replace it with a login flow that stores and refreshes a signed
   access token.
 
-- **HITL interrupt UI**: The `interrupt` SSE event is currently ignored.
-  When the backend pauses for human approval (e.g., `create_supplier`),
-  the frontend should render an action card allowing the user to
-  approve/reject and then call `POST /api/chat/{thread_id}/resume`.
+- **HITL interrupt UI**: Input and approval interruptions are implemented by
+  `InterruptCard.vue`, `HitlApprovalBar.vue`, and the store's
+  `resumeInput`/`resumeApprove`/`resumeReject` actions. Keep the payload aligned
+  with the backend `Command(resume=...)` contract when changing either side.
 
 - **Error UX**: API errors display a raw "请求失败：…" string in the chat bubble.
   Consider a dedicated error state / toast notification.
 
-- **Conversation deletion**: The `ChatView.vue` sidebar menu has a "删除" item
-  wired up, but there is no `DELETE /api/chat/{thread_id}` backend endpoint yet.
-  Either implement the endpoint or remove the menu item.
+- **Conversation deletion**: `ChatView.vue` currently displays a "删除" menu
+  item, but it has no action and the backend has no delete endpoint. Do not
+  describe deletion as supported until both sides are implemented.
 
 - **Message pagination**: `fetchThreadMessages` returns all messages for a thread.
   For long conversations, add a `limit` / `cursor` parameter and lazy-load older
