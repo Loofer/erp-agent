@@ -9,6 +9,8 @@ import yaml
 from deepagents import FilesystemMiddleware, SubAgent
 from deepagents.backends import LocalShellBackend
 
+from agent.middlewares.pii_middleware import tool_call_limit_middleware
+
 SubagentBackend = Literal["local_shell"]
 
 
@@ -222,7 +224,8 @@ def to_deep_agent_subagents(
                         root_dir=backend_root,
                         inherit_env=True,
                     ),
-                )
+                ),
+                tool_call_limit_middleware
             ]
         subagents.append(sub_agent)
     return subagents

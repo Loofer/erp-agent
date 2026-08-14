@@ -128,7 +128,7 @@ from ragas import Dataset
 dataset = Dataset(
     name="test_dataset",
     backend="local/csv",  # Can also use JSONL, Google Drive, or in‑memory
-    root_dir=".",
+    root_dir="..",
 )
 
 # Add samples to the dataset

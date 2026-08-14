@@ -138,7 +138,7 @@ def load_agent_graph(
         model=model_name or settings.motorparts_agent_model,
         api_key=settings.motorparts_model_api_key,
         base_url=settings.motorparts_model_base_url,
-
+        max_tokens=105000,
     )
 
     config_directory = Path(__file__).parent / "subagents" / "configs"
