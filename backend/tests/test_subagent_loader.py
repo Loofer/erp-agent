@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from deepagents import FilesystemMiddleware
 from deepagents.backends import LocalShellBackend
+from langchain.agents.middleware import ToolCallLimitMiddleware
 
 from agent.subagents.loader import (
     SubagentConfigurationError,
@@ -74,7 +75,7 @@ def test_shipped_subagent_definitions_cover_research_analysis_and_order() -> Non
     assert "前端 ECharts" in analyst_definition.system_prompt
     assert "禁止使用 matplotlib" in analyst_definition.system_prompt
     assert "不得写 `d[\\'key\\']`" in analyst_definition.system_prompt
-    assert "Main Agent 使用 read_file" in analyst_definition.system_prompt
+    assert "read_file" in analyst_definition.system_prompt
     assert order_definition.skills == ("/skills/order/",)
     supplier_definition = next(
         definition for definition in definitions if definition.name == "supplier_manager"
@@ -146,10 +147,11 @@ def test_local_shell_backend_adds_subagent_filesystem_middleware(tmp_path: Path)
     )
 
     middleware = subagents[0]["middleware"]
-    assert len(middleware) == 1
+    assert len(middleware) == 2
     assert isinstance(middleware[0], FilesystemMiddleware)
     assert isinstance(middleware[0].backend, LocalShellBackend)
     assert middleware[0].backend.cwd == tmp_path.resolve()
+    assert isinstance(middleware[1], ToolCallLimitMiddleware)
 
 
 @pytest.mark.parametrize(

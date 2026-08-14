@@ -16,7 +16,7 @@ def test_skill_documents_describe_current_tools_and_native_approval() -> None:
     assert "supplier_manager" in memory_content
     assert "/memory/AGENTS.md" in memory_content
     assert "/memories/preferences.md" in memory_content
-    assert "config.configurable.user_id" in memory_content
+    assert "runtime.context" in memory_content
     assert "持久化到 `/per`" not in memory_content
     assert "assign_skill" not in memory_content
     assert "supplier_query" in analysis_guide.read_text(encoding="utf-8")

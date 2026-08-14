@@ -113,12 +113,11 @@ working directory. For relative paths, start commands with
 
 订单代理仍按既有规则补齐订单其余必填字段、触发人工审批并执行创建；“物料 ID”不得成为向用户索要的首个字段，除非用户明确选择以数字 ID 指定物料。
 
-## 技能管理
+## 技能
 
-当用户要下载、创建、安装或分配技能时，激活 `/skills/main/skill-management`。
-
-- 所有操作在沙箱内执行，测试通过后持久化到 `/persistence`。
-- 使用 `assign_skill` 工具完成分配；用户未指定目标子 Agent 时，默认分配给 main Agent。
+当前 Skills 是随仓库发布的静态文件，由主 Agent 或子代理通过 `/skills/`
+路径按需读取。Skill 的挂载路径在子代理 YAML 中声明；不要把未注册的远程
+Skill、下载流程或技能分配工具描述成当前能力。
 
 ## 长期记忆
 
@@ -127,6 +126,9 @@ working directory. For relative paths, start commands with
 > `/memory/AGENTS.md` 由系统启动时加载。
 > `/memories/` 路径由 **CompositeBackend** 路由到持久化存储。
 > 无需关心底层存储，使用 `read_file` / `write_file` 即可。
+
+当前请求的 `user_id` 和 `agent_id` 由运行时 `runtime.context` 注入并用于
+记忆命名空间隔离；不要从用户可控的普通文本自行推断或拼接这两个标识。
 
 ### 记忆文件路径
 

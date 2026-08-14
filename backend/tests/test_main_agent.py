@@ -3,6 +3,7 @@ from typing import Any
 
 from deepagents import FilesystemMiddleware
 from deepagents.backends import CompositeBackend, LocalShellBackend, StoreBackend
+from langchain.agents.middleware import ToolCallLimitMiddleware
 from langgraph.store.memory import InMemoryStore
 
 from agent.main_agent import create_main_agent
@@ -111,10 +112,11 @@ def test_main_agent_configures_local_shell_for_declared_subagent(
 
     subagent = captured["subagents"][0]
     middleware = subagent["middleware"]
-    assert len(middleware) == 1
+    assert len(middleware) == 2
     assert isinstance(middleware[0], FilesystemMiddleware)
     assert isinstance(middleware[0].backend, LocalShellBackend)
     assert middleware[0].backend.cwd == Path(__file__).resolve().parents[1]
+    assert isinstance(middleware[1], ToolCallLimitMiddleware)
 
 
 def test_deployment_entrypoint_loads_yaml_before_creating_main_agent(
