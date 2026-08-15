@@ -16,6 +16,12 @@ Motorparts Agent 是一个开源工程项目，将 Harness Engineering 思路应
 
 > **项目状态：** 持续演进中。认证、可观测性、部署编排及若干高级工作流仍在路线图中。
 
+## 系统架构
+
+![Motorparts Agent architecture](docs/images/motorparts-agent-architecture.png)
+
+架构图将当前运行时与规划中的平台能力分开。当前路径覆盖 Vue 客户端、FastAPI/SSE 边界、LangGraph Agent Harness、工具与 Skills、HITL 暂停/恢复、PostgreSQL 状态、混合 RAG 和离线评测。
+
 ## 特性
 
 ### UI 与流式交互
@@ -68,12 +74,6 @@ Motorparts Agent 是一个开源工程项目，将 Harness Engineering 思路应
 - **离线 Agent 评测**：带标签的 Motorparts Agent 数据集通过 Mock Motorparts fixture 驱动生产图，记录最终回答、工具选择、检索上下文、工具证据、错误和延迟。
 - **RAGAS 质量指标**：可选 LLM Judge 评分忠实度、回答相关性、上下文精确率、上下文召回率和回答正确性；工具正确性则根据预期与实际工具独立计算。
 - **可诊断回归评测**：评测复用生产 Agent 编排与只读 Motorparts fixture，同时保留回答、检索证据、工具轨迹、错误和延迟，帮助区分召回、工具选择与生成问题。详见 [`Ragas-Agent-Evaluation-Practical.md`](backend/docs/evals/Ragas-Agent-Evaluation-Practical.md)。
-
-## 系统架构
-
-![Motorparts Agent architecture](docs/images/motorparts-agent-architecture.png)
-
-架构图将当前运行时与规划中的平台能力分开。当前路径覆盖 Vue 客户端、FastAPI/SSE 边界、LangGraph Agent Harness、工具与 Skills、HITL 暂停/恢复、PostgreSQL 状态、混合 RAG 和离线评测。
 
 ## 核心工作流
 
@@ -141,7 +141,9 @@ pnpm dev
 
 ## 截图
 
-后续将在此添加流式聊天、检索增强分析、图表输出和 HITL 审批流程截图。
+| ![知识检索与检索增强回答](docs/images/screenshots/search_knowdge.png)流式聊天与检索到的知识上下文。 | ![聊天流程中的提示词注入检测](docs/images/screenshots/promptInjection2.png)运行时提示词注入检测。 | ![受控图表输出](docs/images/screenshots/chart_render.png)经过校验的图表渲染。 |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ![Human-in-the-Loop 审批流程](docs/images/screenshots/hitl.png)关键写操作提交前的人工审批。 | ![LangSmith 中的请求上下文注入](docs/images/screenshots/langsmith_trace_request_context_injection.png)链路追踪中的请求上下文。 | ![LangSmith 中的提示词注入追踪](docs/images/screenshots/promptInjection_langsmith.png)LangSmith 中的安全防护决策。 |
 
 ## 文档索引
 

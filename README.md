@@ -23,6 +23,15 @@ continues from durable state.
 > deployment orchestration, and several advanced workflows remain in the
 > roadmap.
 
+## Architecture
+
+![Motorparts Agent architecture](docs/images/motorparts-agent-architecture.png)
+
+The architecture diagram separates the current runtime from planned platform
+capabilities. The current path covers the Vue client, FastAPI/SSE boundary,
+LangGraph agent harness, tools and Skills, HITL pause/resume, PostgreSQL state,
+hybrid RAG, and offline evaluation.
+
 ## Features
 
 ### UI and Streaming Interaction
@@ -149,15 +158,6 @@ continues from durable state.
   evidence, tool traces, errors, and latency to distinguish retrieval, tool
   selection, and generation failures. See [`Ragas-Agent-Evaluation-Practical.md`](backend/docs/evals/Ragas-Agent-Evaluation-Practical.md).
 
-## Architecture
-
-![Motorparts Agent architecture](docs/images/motorparts-agent-architecture.png)
-
-The architecture diagram separates the current runtime from planned platform
-capabilities. The current path covers the Vue client, FastAPI/SSE boundary,
-LangGraph agent harness, tools and Skills, HITL pause/resume, PostgreSQL state,
-hybrid RAG, and offline evaluation.
-
 ## Core Workflows
 
 ### Procurement Analysis
@@ -232,8 +232,9 @@ the backend at port 8000.
 
 ## Screenshots
 
-Screenshots of the streaming chat, retrieval-assisted analysis, chart output,
-and HITL approval flow will be added here.
+| ![Knowledge search and retrieval-assisted answer](docs/images/screenshots/search_knowdge.png)Streaming chat and retrieved knowledge context. | ![Prompt-injection detection in the chat workflow](docs/images/screenshots/promptInjection2.png)Runtime prompt-injection detection. | ![Controlled chart output](docs/images/screenshots/chart_render.png)Validated chart rendering. |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ![Human-in-the-loop approval flow](docs/images/screenshots/hitl.png)Approval before a consequential write. | ![Request context injection in a LangSmith trace](docs/images/screenshots/langsmith_trace_request_context_injection.png)Request context in trace metadata. | ![Prompt-injection trace in LangSmith](docs/images/screenshots/promptInjection_langsmith.png)Guardrail decisions in LangSmith. |
 
 ## Documentation
 
