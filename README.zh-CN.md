@@ -163,6 +163,7 @@ pnpm dev
 ## 路线图
 
 - 前端后续重构并迁移至 [assistant-ui](https://github.com/assistant-ui/assistant-ui)，利用其对 LangChain 和 LangGraph 的原生支持，更好地衔接后端 Agent 运行时。
+- 基于 Unstructured 优化 RAG 文档解析能力
 - 生产级认证和授权。
 - LangSmith 链路追踪、运行监控和成本可见性。
 - 容器化部署与环境编排。

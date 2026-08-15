@@ -254,6 +254,7 @@ the backend at port 8000.
 ## Roadmap
 
 - Refactor and migrate the frontend to [assistant-ui](https://github.com/assistant-ui/assistant-ui), whose native LangChain and LangGraph support better aligns with the backend runtime.
+- RAG document parsing enhancement with Unstructured
 - Production-grade authentication and authorization.
 - LangSmith tracing, operational monitoring, and cost visibility.
 - Containerized deployment and environment orchestration.
