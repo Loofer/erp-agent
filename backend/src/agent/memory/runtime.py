@@ -88,6 +88,12 @@ def build_runtime_permissions() -> list[FilesystemPermission]:
             paths=["/memories/**"],
             mode="allow",
         ),
+        # 3. sandbox：允许 read + write
+        FilesystemPermission(
+            operations=["read", "write"],
+            paths=["/sandbox/**"],
+            mode="allow",
+        ),
         # 👉 没有加全局 deny，如果你需要严格白名单再追加下面这条
         # FilesystemPermission(
         #     operations=["read", "write"],
