@@ -115,6 +115,17 @@ export async function fetchSessionMessages(threadId: string): Promise<ChatMessag
   }
 }
 
+/** DELETE /api/chat/{thread_id}，删除会话及其所有 Agent checkpoint。 */
+export async function deleteSession(threadId: string): Promise<void> {
+  const res = await fetch(`/api/chat/${encodeURIComponent(threadId)}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+  }
+}
+
 /**
  * POST /api/chat/{thread_id}/resume
  *

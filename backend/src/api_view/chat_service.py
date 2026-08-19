@@ -243,6 +243,12 @@ class ChatService:
         raw_messages = state.values.get("messages", [])
         return {"messages": _serialize_timeline(raw_messages)}
 
+    async def delete_session(self, thread_id: str, user_id: str) -> bool:
+        """Delete one owned session and all of its checkpoint namespaces."""
+        if self._sessions is None:
+            return False
+        return await self._sessions.delete_session(thread_id, user_id, self._agent_id)
+
     async def _persist_turn_events(self, events: "_SessionEventBuffer") -> None:
         if self._sessions is None:
             return

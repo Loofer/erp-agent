@@ -7,7 +7,7 @@ import uuid as _uuid_mod
 from collections.abc import AsyncIterator
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response, status
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
@@ -124,6 +124,17 @@ async def get_session_messages(
 ) -> dict[str, object]:
     """Return stored messages for an existing session thread."""
     return await service.get_session_messages(thread_id, request_user(request).user_id)
+
+
+@router.delete("/api/chat/{thread_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["chat"])
+async def delete_session(
+        thread_id: str,
+        request: Request,
+        service: ChatServiceDependency,
+) -> Response:
+    """Delete an owned session's event log and all LangGraph checkpoints."""
+    await service.delete_session(thread_id, request_user(request).user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ---------------------------------------------------------------------------

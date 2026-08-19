@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, ref, computed, nextTick, onMounted } from 'vue'
+import { Modal, message } from 'ant-design-vue'
 import { Conversations, Sender } from 'ant-design-x-vue'
 import type { ConversationsProps } from 'ant-design-x-vue'
 import { PlusOutlined, RobotOutlined, StopOutlined, ToolOutlined } from '@ant-design/icons-vue'
@@ -62,8 +63,30 @@ async function handleSend(val: string) {
   scrollToBottom()
 }
 
-const sessionMenuConfig: ConversationsProps['menu'] = () => ({
+function confirmDeleteSession(threadId: string) {
+  if (store.loading && store.currentThreadId === threadId) return
+
+  Modal.confirm({
+    title: '删除会话',
+    content: '删除后无法恢复，是否继续？',
+    okText: '删除',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        await store.deleteSession(threadId)
+      } catch {
+        message.error('删除会话失败，请稍后重试')
+      }
+    },
+  })
+}
+
+const sessionMenuConfig: ConversationsProps['menu'] = (session) => ({
   items: [{ key: 'delete', label: '删除', danger: true }],
+  onClick: ({ key }) => {
+    if (key === 'delete') confirmDeleteSession(session.key)
+  },
 })
 </script>
 

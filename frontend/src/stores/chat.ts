@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { fetchSessionMessages, fetchSessions, resumeChat, streamChat } from '@/api/chat'
+import {
+  deleteSession as deleteSessionRequest,
+  fetchSessionMessages,
+  fetchSessions,
+  resumeChat,
+  streamChat,
+} from '@/api/chat'
 import type { ChatMessage, SessionItem, StreamCallbacks } from '@/api/chat'
 import type { InterruptData, ResumePayload } from '@/types/agent'
 
@@ -69,6 +75,14 @@ export const useChatStore = defineStore('chat', () => {
     currentThreadId.value = null
     messages.value = []
     pendingInterrupt.value = null
+  }
+
+  async function deleteSession(threadId: string) {
+    if (loading.value && currentThreadId.value === threadId) return
+
+    await deleteSessionRequest(threadId)
+    sessions.value = sessions.value.filter((session) => session.key !== threadId)
+    if (currentThreadId.value === threadId) newSession()
   }
 
   function cancelStream() {
@@ -272,6 +286,7 @@ export const useChatStore = defineStore('chat', () => {
     loadSessions,
     selectSession,
     newSession,
+    deleteSession,
     sendMessage,
     cancelStream,
     resumeApprove,

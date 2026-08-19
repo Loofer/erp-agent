@@ -133,6 +133,7 @@ Key actions:
 | `loadSessions()` | Fetches all threads for the current user via `GET /api/history` |
 | `selectSession(threadId)` | Switches to a thread and loads its messages |
 | `newSession()` | Resets state to start a blank session |
+| `deleteSession(threadId)` | Deletes a session and resets the active thread when needed |
 
 `sendMessage` appends a placeholder assistant bubble (`loading: true`) immediately,
 then fills `content` incrementally as SSE `message_chunk` events arrive.
@@ -241,9 +242,9 @@ backend, or configure a reverse proxy so `/api` routes hit the backend.
 - **Error UX**: API errors display a raw "请求失败：…" string in the chat bubble.
   Consider a dedicated error state / toast notification.
 
-- **Session deletion**: `ChatView.vue` currently displays a "删除" menu
-  item, but it has no action and the backend has no delete endpoint. Do not
-  describe deletion as supported until both sides are implemented.
+- **Session deletion**: `ChatView.vue` confirms deletion through its session
+  menu. The backend removes the event log plus all LangGraph checkpoints for
+  the thread, including child-agent checkpoint namespaces.
 
 - **Message pagination**: `fetchThreadMessages` returns all messages for a thread.
   For long sessions, add a `limit` / `cursor` parameter and lazy-load older

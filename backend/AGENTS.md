@@ -173,6 +173,7 @@ and Skills are write-denied. The procurement-analysis subagent may use
 | `POST` | `/api/chat/{thread_id}/resume` | Resume a pending HITL interruption |
 | `GET` | `/api/history?user_id=...` | List session threads for the JWT user |
 | `GET` | `/api/chat/{thread_id}/messages?user_id=...` | Read stored thread messages |
+| `DELETE` | `/api/chat/{thread_id}` | Delete the owned session, event log, and all parent/subagent checkpoints |
 | `GET` | `/health` | Return `{"status":"ok"}` |
 
 The SSE projection currently includes `session`, `message_chunk`,

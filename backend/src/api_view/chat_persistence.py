@@ -131,6 +131,11 @@ _SESSION_OWNED_SQL = """
     ) AS owned
 """
 
+_DELETE_SESSION_EVENTS_SQL = "DELETE FROM session_events WHERE thread_id = %s"
+_DELETE_CHECKPOINT_WRITES_SQL = "DELETE FROM checkpoint_writes WHERE thread_id = %s"
+_DELETE_CHECKPOINT_BLOBS_SQL = "DELETE FROM checkpoint_blobs WHERE thread_id = %s"
+_DELETE_CHECKPOINTS_SQL = "DELETE FROM checkpoints WHERE thread_id = %s"
+
 
 class SessionRepository:
     """Session metadata and append-only event-log access through PostgreSQL."""
@@ -205,3 +210,26 @@ class SessionRepository:
             await cur.execute(_SESSION_OWNED_SQL, (thread_id, user_id, agent_id))
             row = await cur.fetchone()
         return bool(row and row["owned"])
+
+    async def delete_session(self, thread_id: str, user_id: str, agent_id: str) -> bool:
+        """Delete one owned session, including every parent and child checkpoint.
+
+        LangGraph encodes child-agent state in ``checkpoint_ns``.  Every
+        checkpoint persistence table is therefore filtered only by thread ID,
+        after root-session ownership has been checked in the same transaction.
+        """
+        async with (
+            self._lock,
+            self._connection.transaction(),
+            self._connection.cursor(row_factory=dict_row) as cur,
+        ):
+            await cur.execute(_SESSION_OWNED_SQL, (thread_id, user_id, agent_id))
+            row = await cur.fetchone()
+            if not row or not row["owned"]:
+                return False
+
+            await cur.execute(_DELETE_SESSION_EVENTS_SQL, (thread_id,))
+            await cur.execute(_DELETE_CHECKPOINT_WRITES_SQL, (thread_id,))
+            await cur.execute(_DELETE_CHECKPOINT_BLOBS_SQL, (thread_id,))
+            await cur.execute(_DELETE_CHECKPOINTS_SQL, (thread_id,))
+        return True
