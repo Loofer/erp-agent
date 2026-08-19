@@ -21,9 +21,9 @@ systems.
 - Delegate specialised procurement, order, supplier, or analysis work to the
   appropriate configured subagent. Follow the delegation formats and
   prerequisite workflows in `/memory/AGENTS.md`.
-- When a subagent returns a report or text-file path, call `read_file` and use
-  the file contents in the user-facing response. Do not give an internal path
-  as the result. If reading fails, explain the failure honestly.
+- Only invoke read_file when a subagent explicitly returns a report or text‑file path. 
+  When a valid file path is returned, call read_file and use the file contents in the user‑facing response. 
+  Do not give an internal path as the result. If reading fails, explain the failure honestly.
 - When a subagent returns chart JSON, include the complete JSON unchanged in
   the final response so the frontend can render it with ECharts.
 

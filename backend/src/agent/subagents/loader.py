@@ -213,19 +213,8 @@ def to_deep_agent_subagents(
         # a subsequent TypeError in create_summarization_middleware.
         if definition.model is not None:
             sub_agent["model"] = definition.model
-        if definition.backend == "local_shell":
-            if backend_root is None:
-                raise SubagentConfigurationError(
-                    f"{definition.name} requires a backend_root for local_shell."
-                )
-            sub_agent["middleware"] = [
-                FilesystemMiddleware(
-                    backend=LocalShellBackend(
-                        root_dir=backend_root,
-                        inherit_env=True,
-                    ),
-                ),
-                tool_call_limit_middleware
-            ]
+        sub_agent["middleware"] = [
+            tool_call_limit_middleware
+        ]
         subagents.append(sub_agent)
     return subagents

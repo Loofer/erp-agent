@@ -24,7 +24,7 @@ Motorparts 查询工具
   -> 只取得内部供应商、物料、订单和库存数据
   -> execute 运行 Python 聚合、比较、趋势或加权计算
   -> 需要图表时输出单行 chart JSON
-  -> 复杂报告写入 /analysis/report_{timestamp}.md
+  -> 复杂报告写入 /sandbox/analysis/report_{timestamp}.md
 ```
 
 具体边界如下：
@@ -76,7 +76,7 @@ procurement_analyst
 
 当前实现的相关位置：
 
-1. [`procurement_analyst.yaml`](../../src/agent/subagents/configs/procurement_analyst.yaml) 声明 `backend: local_shell`，规定 `execute` 用于内部数据计算，复杂报告写入 `/analysis/report_{timestamp}.md`。
+1. [`procurement_analyst.yaml`](../../src/agent/subagents/configs/procurement_analyst.yaml) 声明 `backend: local_shell`，规定 `execute` 用于内部数据计算，复杂报告写入 `/sandbox/analysis/report_{timestamp}.md`。
 2. [`loader.py`](../../src/agent/subagents/loader.py) 将 `local_shell` 配置转换为子 Agent 的执行和文件中间件；接入 AIO Sandbox 时应在这里增加或替换 Backend 类型与构造逻辑。
 3. [`SKILL.md`](../../skills/procurement/procurement-analysis/SKILL.md) 规定五步分析流程、禁止图像图表文件，并要求图表脚本使用 `chart_params.md` 契约。
 4. [`chart_params.md`](../../skills/procurement/procurement-analysis/reference/chart_params.md) 定义 chart JSON 的机器可读格式。

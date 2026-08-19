@@ -53,7 +53,7 @@ description: >
 
 ### 第 5 步：生成复杂报告
 1. 根据分析结果汇总报告；报告中引用图表标题或图表清单，不生成或拼装图表 URL。
-2. 简单报告直接在回复中返回，不写文件。复杂长报告调用 `write_file` 写入 `/analysis/report_{timestamp}.md`，其中 `timestamp` 为 Unix 时间戳；数据不足时仍可落盘并明确缺口。
+2. 简单报告直接在回复中返回，不写文件。复杂长报告调用 `write_file` 写入 `/sandbox/analysis/report_{timestamp}.md`，其中 `timestamp` 为 Unix 时间戳；数据不足时仍可落盘并明确缺口。
 3. 返回轻量摘要、报告路径，并明确提示必须调用 `read_file` 读取报告后再向用户回答；不得建议用户自行查看内部路径。
 
 ## 报告模板

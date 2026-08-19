@@ -9,7 +9,7 @@ def test_system_prompt_contains_operating_constraints() -> None:
     assert "Motorparts facts" in prompt
     assert "human-in-the-loop" in prompt
     assert "Only call `read_file`" in prompt
-    assert "/analysis/report_*.md" in prompt
+    assert "/sandbox/analysis/report_*.md" in prompt
     assert "/sandbox/procurement_analyst_report_*.md" in prompt
     assert "read_file" in prompt
 

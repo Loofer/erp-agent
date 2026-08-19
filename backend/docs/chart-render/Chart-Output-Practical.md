@@ -6,7 +6,7 @@
 
 ## 一、Chart 不是报告格式
 
-Chart JSON 只传输可视化所需的数据，不能承载分析过程、报告正文、内部文件路径或 HTML。复杂采购报告仍由 `write_file` 写入 `/analysis/report_{timestamp}.md`；主 Agent 读取报告后组织用户可见的结论。
+Chart JSON 只传输可视化所需的数据，不能承载分析过程、报告正文、内部文件路径或 HTML。复杂采购报告仍由 `write_file` 写入 `/sandbox/analysis/report_{timestamp}.md`；主 Agent 读取报告后组织用户可见的结论。
 
 这对应明确的职责划分：
 
