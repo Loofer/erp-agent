@@ -83,7 +83,7 @@ def test_application_lifespan_initializes_chat_service(monkeypatch) -> None:
         async def __aexit__(self, *_: object) -> None:
             return None
 
-    class FakeConversationRepository:
+    class FakeSessionRepository:
         def __init__(self, connection: object) -> None:
             assert isinstance(connection, FakeConnection)
 
@@ -95,7 +95,7 @@ def test_application_lifespan_initializes_chat_service(monkeypatch) -> None:
     monkeypatch.setattr(web_main, "PostgresStore", FakeStore)
     monkeypatch.setattr(web_main, "AsyncPostgresSaver", FakeSaver)
     monkeypatch.setattr(web_main, "AsyncConnection", FakeConnection)
-    monkeypatch.setattr(web_main, "ConversationRepository", FakeConversationRepository)
+    monkeypatch.setattr(web_main, "SessionRepository", FakeSessionRepository)
     monkeypatch.setattr(web_main, "build_hybrid_retriever", lambda _: None)
 
     def fake_load_agent_graph(**kwargs: object) -> object:

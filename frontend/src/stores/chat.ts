@@ -1,12 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { fetchHistory, fetchThreadMessages, resumeChat, streamChat } from '@/api/chat'
-import type { ChatMessage, ConversationItem, StreamCallbacks } from '@/api/chat'
+import { fetchSessionMessages, fetchSessions, resumeChat, streamChat } from '@/api/chat'
+import type { ChatMessage, SessionItem, StreamCallbacks } from '@/api/chat'
 import type { InterruptData, ResumePayload } from '@/types/agent'
 
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<ChatMessage[]>([])
-  const conversations = ref<ConversationItem[]>([])
+  const sessions = ref<SessionItem[]>([])
   const currentThreadId = ref<string | null>(null)
   const loading = ref(false)
   const pendingInterrupt = ref<InterruptData | null>(null)
@@ -48,24 +48,24 @@ export const useChatStore = defineStore('chat', () => {
     messages.value.push(loadingAssistant)
   }
 
-  async function loadHistory() {
-    conversations.value = await fetchHistory()
+  async function loadSessions() {
+    sessions.value = await fetchSessions()
   }
 
-  async function selectConversation(threadId: string) {
+  async function selectSession(threadId: string) {
     if (currentThreadId.value === threadId) return
     currentThreadId.value = threadId
     messages.value = []
     pendingInterrupt.value = null
     loading.value = true
     try {
-      messages.value = await fetchThreadMessages(threadId)
+      messages.value = await fetchSessionMessages(threadId)
     } finally {
       loading.value = false
     }
   }
 
-  function newConversation() {
+  function newSession() {
     currentThreadId.value = null
     messages.value = []
     pendingInterrupt.value = null
@@ -144,8 +144,8 @@ export const useChatStore = defineStore('chat', () => {
 
   function buildCallbacks(): StreamCallbacks {
     return {
-      onConversation(threadId) {
-        const isNew = !conversations.value.some((conversation) => conversation.key === threadId)
+      onSession(threadId) {
+        const isNew = !sessions.value.some((session) => session.key === threadId)
         currentThreadId.value = threadId
         if (!isNew) return
         const firstUserMessage = messages.value.find((message) => message.kind === 'user')
@@ -153,7 +153,7 @@ export const useChatStore = defineStore('chat', () => {
           ? firstUserMessage.content.slice(0, 30) +
             (firstUserMessage.content.length > 30 ? '...' : '')
           : threadId.slice(0, 8)
-        conversations.value.unshift({ key: threadId, label, timestamp: Date.now() })
+        sessions.value.unshift({ key: threadId, label, timestamp: Date.now() })
       },
       onChunk(chunk, messageId, agentName, namespace) {
         const existing = messages.value.find((message) => message.id === messageId)
@@ -265,13 +265,13 @@ export const useChatStore = defineStore('chat', () => {
 
   return {
     messages,
-    conversations,
+    sessions,
     currentThreadId,
     loading,
     pendingInterrupt,
-    loadHistory,
-    selectConversation,
-    newConversation,
+    loadSessions,
+    selectSession,
+    newSession,
     sendMessage,
     cancelStream,
     resumeApprove,

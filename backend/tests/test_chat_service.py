@@ -31,7 +31,7 @@ async def test_resume_stream_uses_command_and_thread_configuration() -> None:
     from api_view.chat_service import ChatService
 
     graph = FakeGraph()
-    service = ChatService(graph, None)  # conversations not used during stream()
+    service = ChatService(graph, None)  # session storage is not used in this test
 
     events = [
         event
@@ -154,6 +154,197 @@ async def test_stream_preserves_parent_and_subagent_identity() -> None:
     assert chunks[1]["namespace"] == []
     assert chunks[1]["agent_name"] == "motorparts-agent"
     assert chunks[1]["data"]["content"] == "final answer"
+
+
+class RecordingSessionRepository:
+    def __init__(self) -> None:
+        self.batches: list[list[dict[str, object]]] = []
+
+    async def append_events(self, events: list[dict[str, object]]) -> None:
+        self.batches.append(events)
+
+    async def get_session_events(self, *_: object) -> list[dict[str, object]]:
+        return []
+
+
+@pytest.mark.anyio
+async def test_session_log_retains_subagent_text_after_stream_completion() -> None:
+    from api_view.chat_service import ChatService
+
+    sessions = RecordingSessionRepository()
+    service = ChatService(ParentAndSubagentGraph(), sessions)
+
+    events = [
+        event
+        async for event in service.stream("create a supplier", "thread-1", "user-1")
+    ]
+
+    assert events[0]["event"] == "session"
+    stored = sessions.batches[0]
+    assert [event["event_type"] for event in stored] == [
+        "user_message",
+        "assistant_text",
+        "assistant_text",
+        "turn_completed",
+    ]
+    assert stored[1]["source"] == "supplier_manager"
+    assert stored[1]["namespace"] == ["tools:subagent-run"]
+    assert stored[1]["payload"] == {"content": "internal result"}
+    assert stored[2]["source"] == "motorparts-agent"
+
+
+class SubagentToolGraph(FakeGraph):
+    async def astream(self, **kwargs: Any) -> AsyncIterator[dict[str, object]]:
+        self.input = kwargs["input"]
+        self.config = kwargs["config"]
+        self.context = kwargs["context"]
+        yield {
+            "type": "values",
+            "ns": ["tools:procurement_analyst"],
+            "data": {
+                "messages": [
+                    AIMessage(
+                        content="",
+                        id="subagent-ai",
+                        name="procurement_analyst",
+                        tool_calls=[
+                            {
+                                "id": "search-1",
+                                "name": "part_search",
+                                "args": {"keyword": "FR7DC+"},
+                            }
+                        ],
+                    )
+                ]
+            },
+        }
+        yield {
+            "type": "messages",
+            "ns": ["tools:procurement_analyst"],
+            "data": (
+                ToolMessage(
+                    content='{"items": []}',
+                    id="search-result",
+                    tool_call_id="search-1",
+                    name="part_search",
+                ),
+                {"lc_agent_name": "procurement_analyst"},
+            ),
+        }
+
+
+@pytest.mark.anyio
+async def test_session_log_links_subagent_tool_events_by_native_tool_call_id() -> None:
+    from api_view.chat_service import ChatService
+
+    sessions = RecordingSessionRepository()
+    service = ChatService(SubagentToolGraph(), sessions)
+    await _collect(service.stream("find a part", "thread-1", "user-1"))
+
+    stored = sessions.batches[0]
+    start, end = stored[1:3]
+    assert start["event_type"] == "tool_call_start"
+    assert end["event_type"] == "tool_call_end"
+    assert start["tool_call_id"] == end["tool_call_id"] == "search-1"
+    assert start["source"] == end["source"] == "procurement_analyst"
+    assert start["payload"]["args"] == {"keyword": "FR7DC+"}
+
+
+def test_session_events_become_the_existing_timeline_shape() -> None:
+    from api_view.chat_service import _serialize_session_timeline
+
+    timeline = _serialize_session_timeline(
+        [
+            {
+                "event_id": "user-1",
+                "event_type": "user_message",
+                "source": "user",
+                "payload": {"content": "find FR7DC+"},
+            },
+            {
+                "event_id": "route-1",
+                "event_type": "agent_routing",
+                "source": "motorparts-agent",
+                "payload": {
+                    "tool_call_id": "task-1",
+                    "subagent_type": "procurement_analyst",
+                    "description": "Find the part.",
+                },
+            },
+            {
+                "event_id": "start-1",
+                "event_type": "tool_call_start",
+                "source": "procurement_analyst",
+                "payload": {
+                    "tool_call_id": "search-1",
+                    "tool_name": "part_search",
+                    "args": {"keyword": "FR7DC+"},
+                },
+            },
+            {
+                "event_id": "end-1",
+                "event_type": "tool_call_end",
+                "source": "procurement_analyst",
+                "payload": {
+                    "tool_call_id": "search-1",
+                    "tool_name": "part_search",
+                    "result": '{"items": []}',
+                    "tool_status": "success",
+                },
+            },
+        ]
+    )
+
+    assert [item["kind"] for item in timeline] == [
+        "user",
+        "agent_routing",
+        "tool_call",
+        "tool_result",
+    ]
+    assert timeline[2]["status"] == "success"
+    assert timeline[2]["tool_args"] == {"keyword": "FR7DC+"}
+    assert timeline[3]["tool_call_id"] == "search-1"
+
+
+class SessionHistoryRepository:
+    def __init__(self, events: list[dict[str, object]], *, owned: bool = True) -> None:
+        self._events = events
+        self._owned = owned
+
+    async def get_session_events(self, *_: object) -> list[dict[str, object]]:
+        return self._events
+
+    async def owns_session(self, *_: object) -> bool:
+        return self._owned
+
+
+class HistoryGraph:
+    async def aget_state(self, _: object) -> object:
+        raise AssertionError("event history should be preferred over checkpoint fallback")
+
+
+@pytest.mark.anyio
+async def test_session_history_prefers_event_log_and_enforces_checkpoint_ownership() -> None:
+    from api_view.chat_service import ChatService
+
+    events = [
+        {
+            "event_id": "assistant-1",
+            "event_type": "assistant_text",
+            "source": "procurement_analyst",
+            "namespace": ["tools:procurement_analyst"],
+            "payload": {"content": "Part found."},
+        }
+    ]
+    service = ChatService(HistoryGraph(), SessionHistoryRepository(events))
+
+    history = await service.get_session_messages("thread-1", "user-1")
+
+    assert history["messages"][0]["actor_name"] == "procurement_analyst"
+    assert history["messages"][0]["namespace"] == ["tools:procurement_analyst"]
+
+    denied = ChatService(HistoryGraph(), SessionHistoryRepository([], owned=False))
+    assert await denied.get_session_messages("thread-1", "other-user") == {"messages": []}
 
 
 def test_checkpoint_messages_become_a_flat_timeline_with_tool_results() -> None:

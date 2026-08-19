@@ -8,7 +8,7 @@ long-form architecture notes.
 
 The backend is a FastAPI application that streams a Deep Agents/LangGraph
 procurement assistant over SSE. It owns the graph, Motorparts HTTP tools,
-optional hybrid RAG, and PostgreSQL-backed checkpoints, conversation metadata,
+optional hybrid RAG, and PostgreSQL-backed checkpoints, session metadata,
 and durable user memory.
 
 The application is development-oriented. API requests require a Bearer JWT,
@@ -49,7 +49,7 @@ backend/
 │   ├── auth.py                       # Development JWT claim decoder
 │   ├── chat.py                       # Chat, resume, history, message routes
 │   ├── chat_service.py               # Graph events to SSE event projection
-│   └── chat_persistence.py            # Conversation metadata/message access
+│   └── chat_persistence.py            # Session metadata/message access
 ├── skills/                           # Bundled read-only SKILL.md files
 ├── scripts/ingest_rag.py             # Zilliz/Milvus ingestion command
 ├── evals/                            # Offline agent/evaluation runner
@@ -106,7 +106,7 @@ uv run uvicorn src.api_view.web_main:app --reload --port 8000
 ```
 
 The API listens on `http://localhost:8000`. Startup opens PostgreSQL store,
-checkpoint, and conversation tables, then builds the graph. RAG initialization
+checkpoint, and session tables, then builds the graph. RAG initialization
 failure is logged and the API continues without retrieval.
 
 To index documents into the configured Zilliz collection, run from the
@@ -171,11 +171,11 @@ and Skills are write-denied. The procurement-analysis subagent may use
 |---|---|---|
 | `POST` | `/api/chat/stream` | Start or continue an SSE chat stream |
 | `POST` | `/api/chat/{thread_id}/resume` | Resume a pending HITL interruption |
-| `GET` | `/api/history?user_id=...` | List conversation threads for the JWT user |
+| `GET` | `/api/history?user_id=...` | List session threads for the JWT user |
 | `GET` | `/api/chat/{thread_id}/messages?user_id=...` | Read stored thread messages |
 | `GET` | `/health` | Return `{"status":"ok"}` |
 
-The SSE projection currently includes `conversation`, `message_chunk`,
+The SSE projection currently includes `session`, `message_chunk`,
 `tool_call_start`, `tool_call_end`, `agent_routing`, `interrupt`, `complete`,
 and `error` events. Chat and history endpoints require an Authorization Bearer
 token containing non-empty `sub` and `username` claims.

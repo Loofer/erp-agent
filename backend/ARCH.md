@@ -35,7 +35,7 @@ FastAPI /api
 ```
 
 `src/api_view/web_main.py` composes the application and uses a lifespan to
-create the PostgreSQL store, asynchronous checkpointer, conversation repository,
+create the PostgreSQL store, asynchronous checkpointer, session repository,
 optional retriever, and graph before serving requests. A RAG initialisation
 failure is logged and leaves chat available without retrieval.
 
@@ -52,7 +52,7 @@ failure is logged and leaves chat available without retrieval.
    in a worker thread and renders selected parents as delimited, untrusted
    reference content.
 4. The graph is streamed with LangGraph v2 events and `subgraphs=True`.
-   `ChatService` projects these into the stable SSE contract: `conversation`,
+   `ChatService` projects these into the stable SSE contract: `session`,
    `message_chunk`, `tool_call_start`, `tool_call_end`, `agent_routing`,
    `interrupt`, `complete`, and `error`.
 5. LangGraph checkpoints retain the complete message state and pending
@@ -122,7 +122,7 @@ shared memory and Skills while allowing reads and permits user-memory reads and
 writes. Because no global deny rule is configured, unmatched virtual paths use
 the Deep Agents default and must be reviewed when adding routes.
 
-Automatic conversation summarisation and evicted-history files are Deep Agents
+Automatic session summarisation and evicted-history files are Deep Agents
 runtime behavior. They are distinct from durable user memory and from the
 PostgreSQL checkpoint state.
 
@@ -173,7 +173,7 @@ than implemented backend components.
 
 ## Related Design Notes
 
-- [Memory and conversation design](docs/memory/Memory-Practical.md)
+- [Memory and session design](docs/memory/Memory-Practical.md)
 - [Filesystem permissions](docs/memory/Filesystem-Permission-Practical.md)
 - [Sandbox boundaries](docs/memory/Sandbox-Practical.md)
 - [HITL approval](docs/hitl/HITL-Approval-Practical.md)

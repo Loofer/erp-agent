@@ -36,8 +36,8 @@ hybrid RAG, and offline evaluation.
 
 ### UI and Streaming Interaction
 
-- **Conversation workspace** — Vue 3, Pinia, Ant Design Vue/X, and ECharts
-  provide streaming chat, persisted conversation history, Markdown rendering,
+- **Session workspace** — Vue 3, Pinia, Ant Design Vue/X, and ECharts
+  provide streaming chat, persisted session history, Markdown rendering,
   tool-call timeline entries, subagent-routing visibility, and chart output.
 - **SSE event contract** — FastAPI streams assistant chunks, tool starts and
   results, routing events, interruptions, completion, and safe error events;
@@ -76,10 +76,10 @@ hybrid RAG, and offline evaluation.
   name, time, and retrieval context. Retrieved documents are explicitly
   delimited as untrusted reference material and retain their source IDs.
 - **Automatic context-window management** — Deep Agents automatically
-  summarizes long conversations when a model exposes `max_input_tokens`; the
+  summarizes long sessions when a model exposes `max_input_tokens`; the
   default trigger is 85% of the context window and keeps 10%. For models without
   a profile, the runtime uses its conservative fixed-token fallback. See [`Memory-Practical.md`](backend/docs/memory/Memory-Practical.md).
-- **Recoverable conversation compaction** — before automatic summarization,
+- **Recoverable session compaction** — before automatic summarization,
   evicted history is offloaded to the configured backend and the summary keeps a
   path that the agent can reopen with `read_file`. See [`Memory-Practical.md`](backend/docs/memory/Memory-Practical.md).
 - **Long-term user memory** — durable memory is scoped by agent and user in
@@ -138,7 +138,7 @@ hybrid RAG, and offline evaluation.
   protects model and tool calls against injection, PII, and excessive calls.
   See [`RAG-Agent-Middleware-Defense-and-Context.md`](backend/docs/middleware/RAG-Agent-Middleware-Defense-and-Context.md).
 - **State and auditability foundation** — PostgreSQL persists LangGraph
-  checkpoints, conversation metadata, and the user-visible tool/message
+  checkpoints, session metadata, and the user-visible tool/message
   timeline; it enables interruption recovery and post-run inspection.
 - **Tracing-ready debugging** — SSE events retain LangGraph node, step,
   namespace, subagent, and checkpoint metadata, with optional raw debug payloads
@@ -245,7 +245,7 @@ the backend at port 8000.
 - [`backend/docs/evals/Ragas-Agent-Evaluation-Practical.md`](backend/docs/evals/Ragas-Agent-Evaluation-Practical.md)  RAGAS metrics, tool correctness, and regression diagnosis.
 - [`backend/docs/hitl/HITL-Approval-Practical.md`](backend/docs/hitl/HITL-Approval-Practical.md)  Motorparts write interruption, approval, and resume flow.
 - [`backend/docs/memory/Filesystem-Permission-Practical.md`](backend/docs/memory/Filesystem-Permission-Practical.md)  Permission boundaries for Deep Agents built-in filesystem tools.
-- [`backend/docs/memory/Memory-Practical.md`](backend/docs/memory/Memory-Practical.md)  Conversation summaries, durable user memory, and isolation.
+- [`backend/docs/memory/Memory-Practical.md`](backend/docs/memory/Memory-Practical.md)  Session summaries, durable user memory, and isolation.
 - [`backend/docs/memory/Sandbox-Practical.md`](backend/docs/memory/Sandbox-Practical.md)  `execute` isolation and AIO Sandbox migration design.
 - [`backend/docs/middleware/RAG-Agent-Middleware-Defense-and-Context.md`](backend/docs/middleware/RAG-Agent-Middleware-Defense-and-Context.md)  Query, context injection, prompt-injection, and PII defence path.
 - [`backend/docs/rag/Query-Rewrite-Practical.md`](backend/docs/rag/Query-Rewrite-Practical.md)  Four-view query rewriting and hybrid retrieval practice.

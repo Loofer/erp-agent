@@ -36,8 +36,8 @@ export interface ChatMessage {
   interrupted?: InterruptData
 }
 
-/** 后端 ThreadInfo 结构 */
-export interface ThreadInfo {
+/** 后端 SessionInfo 结构；thread_id 是 LangGraph 的唯一会话标识。 */
+export interface SessionInfo {
   thread_id: string
   user_id: string
   agent_id: string
@@ -47,7 +47,7 @@ export interface ThreadInfo {
   message_count: number
 }
 
-export interface ConversationItem {
+export interface SessionItem {
   key: string
   label: string
   timestamp?: number
@@ -55,15 +55,15 @@ export interface ConversationItem {
 
 /**
  * GET /api/history
- * 后端返回 { threads: ThreadInfo[] }
+ * 后端返回 { sessions: SessionInfo[] }
  */
-export async function fetchHistory(): Promise<ConversationItem[]> {
+export async function fetchSessions(): Promise<SessionItem[]> {
   try {
     const res = await fetch('/api/history', { headers: authHeaders() })
     if (!res.ok) return []
-    const data: { threads: ThreadInfo[] } = await res.json()
-    const threads = data.threads ?? []
-    return threads.map((t) => ({
+    const data: { sessions: SessionInfo[] } = await res.json()
+    const sessions = data.sessions ?? []
+    return sessions.map((t) => ({
       key: t.thread_id,
       label: t.initial_prompt
         ? t.initial_prompt.slice(0, 30) + (t.initial_prompt.length > 30 ? '…' : '')
@@ -79,7 +79,7 @@ export async function fetchHistory(): Promise<ConversationItem[]> {
  * GET /api/chat/{thread_id}/messages
  * 返回指定会话的历史消息列表
  */
-export async function fetchThreadMessages(threadId: string): Promise<ChatMessage[]> {
+export async function fetchSessionMessages(threadId: string): Promise<ChatMessage[]> {
   try {
     const res = await fetch(`/api/chat/${encodeURIComponent(threadId)}/messages`, {
       headers: authHeaders(),
@@ -102,6 +102,9 @@ export async function fetchThreadMessages(threadId: string): Promise<ChatMessage
           : undefined,
       targetAgent: typeof m.subagent_type === 'string' ? m.subagent_type : undefined,
       description: typeof m.description === 'string' ? m.description : undefined,
+      namespace: Array.isArray(m.namespace)
+        ? m.namespace.filter((value): value is string => typeof value === 'string')
+        : undefined,
       status:
         m.status === 'running' || m.status === 'success' || m.status === 'error'
           ? m.status
@@ -155,7 +158,7 @@ export interface ToolCallStart {
 }
 
 export interface StreamCallbacks {
-  onConversation: (threadId: string) => void
+  onSession: (threadId: string) => void
   /** AI 文本增量；namespace 用于区分主 agent 与子 agent 的输出 */
   onChunk: (
     chunk: string,
@@ -316,15 +319,15 @@ function _dispatchEvent(
   parsed: Record<string, unknown>,
   cbs: Omit<StreamCallbacks, 'signal'>,
 ): void {
-  const { onConversation, onChunk, onToolCallStart, onAgentRouting, onToolResult, onInterrupt, onDone, onError } = cbs
+  const { onSession, onChunk, onToolCallStart, onAgentRouting, onToolResult, onInterrupt, onDone, onError } = cbs
   const data = _eventData(parsed)
   const agentName = _string(parsed.agent_name)
   const namespace = _namespaceOf(parsed)
   const messageId = _string(parsed.message_id)
 
   switch (event) {
-    case 'conversation':
-      if (parsed.thread_id) onConversation(parsed.thread_id as string)
+    case 'session':
+      if (parsed.thread_id) onSession(parsed.thread_id as string)
       break
 
     case 'message_chunk': {

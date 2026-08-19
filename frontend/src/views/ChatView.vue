@@ -21,7 +21,7 @@ const visibleMessages = computed(() =>
 )
 
 onMounted(() => {
-  store.loadHistory()
+  store.loadSessions()
 })
 
 async function scrollToBottom() {
@@ -62,7 +62,7 @@ async function handleSend(val: string) {
   scrollToBottom()
 }
 
-const conversationMenuConfig: ConversationsProps['menu'] = () => ({
+const sessionMenuConfig: ConversationsProps['menu'] = () => ({
   items: [{ key: 'delete', label: '删除', danger: true }],
 })
 </script>
@@ -73,17 +73,17 @@ const conversationMenuConfig: ConversationsProps['menu'] = () => ({
     <aside class="sidebar">
       <div class="sidebar-header">
         <span class="logo-title">Motorparts Agent</span>
-        <a-button type="text" :icon="h(PlusOutlined)" @click="store.newConversation" title="新建对话" />
+        <a-button type="text" :icon="h(PlusOutlined)" @click="store.newSession" title="新建对话" />
       </div>
 
       <div class="sidebar-body">
         <Conversations
-          :items="store.conversations"
+          :items="store.sessions"
           :active-key="store.currentThreadId ?? undefined"
-          :menu="conversationMenuConfig"
-          @activeChange="(key: string) => store.selectConversation(key)"
+          :menu="sessionMenuConfig"
+          @activeChange="(key: string) => store.selectSession(key)"
         />
-        <div v-if="store.conversations.length === 0" class="empty-tip">
+        <div v-if="store.sessions.length === 0" class="empty-tip">
           暂无历史对话
         </div>
       </div>

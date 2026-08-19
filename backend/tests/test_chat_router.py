@@ -32,7 +32,7 @@ def test_stream_endpoint_keeps_the_public_path(monkeypatch) -> None:
 
 def test_history_endpoint_keeps_the_public_path(monkeypatch) -> None:
     class FakeChatService:
-        async def list_threads(self, user_id: str):
+        async def list_sessions(self, user_id: str):
             assert user_id == "user-1"
             return [
                 {
@@ -70,8 +70,8 @@ def test_history_endpoint_keeps_the_public_path(monkeypatch) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert "threads" in body
-    assert [t["thread_id"] for t in body["threads"]] == ["thread-2", "thread-1"]
+    assert "sessions" in body
+    assert [t["thread_id"] for t in body["sessions"]] == ["thread-2", "thread-1"]
 
 
 def test_all_chat_routes_are_exposed_from_one_module() -> None:
@@ -85,7 +85,13 @@ def test_all_chat_routes_are_exposed_from_one_module() -> None:
 
 
 def test_all_chat_routes_declare_the_typed_chat_service_dependency() -> None:
-    from api_view.chat import chat_resume, chat_stream, list_history, router
+    from api_view.chat import (
+        chat_resume,
+        chat_stream,
+        get_session_messages,
+        list_history,
+        router,
+    )
 
     dependencies_by_path = {
         route.path: {dependency.call for dependency in route.dependant.dependencies}
@@ -98,3 +104,4 @@ def test_all_chat_routes_declare_the_typed_chat_service_dependency() -> None:
     assert get_type_hints(chat_stream)["service"] is ChatService
     assert get_type_hints(chat_resume)["service"] is ChatService
     assert get_type_hints(list_history)["service"] is ChatService
+    assert get_type_hints(get_session_messages)["service"] is ChatService

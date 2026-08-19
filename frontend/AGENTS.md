@@ -3,7 +3,7 @@
 ## Project Overview
 
 The frontend is a single-page chat application that communicates with the
-`motorparts-agent` backend. Users can start new conversations, browse history,
+`motorparts-agent` backend. Users can start new sessions, browse history,
 and receive streaming AI responses via Server-Sent Events (SSE).
 
 It is built with **Vue 3** (Composition API), **Vite**, and
@@ -34,7 +34,7 @@ frontend/
 │   ├── api/
 │   │   └── chat.ts          # All HTTP/SSE calls to the backend; type definitions
 │   ├── stores/
-│   │   └── chat.ts          # Pinia store — messages, conversations, sendMessage()
+│   │   └── chat.ts          # Pinia store — messages, sessions, sendMessage()
 │   ├── views/
 │   │   └── ChatView.vue     # Main chat page (Bubble + Conversations + Sender)
 │   ├── components/
@@ -119,8 +119,8 @@ The single Pinia store `useChatStore` owns all chat state:
 
 | State | Type | Description |
 |---|---|---|
-| `messages` | `ChatMessage[]` | Messages in the active conversation |
-| `conversations` | `ConversationItem[]` | Sidebar conversation list |
+| `messages` | `ChatMessage[]` | Messages in the active session |
+| `sessions` | `SessionItem[]` | Sidebar session list |
 | `currentThreadId` | `string \| null` | Active LangGraph thread ID |
 | `loading` | `boolean` | `true` while streaming |
 | `pendingInterrupt` | `InterruptData \| null` | Current input or approval HITL pause |
@@ -130,9 +130,9 @@ Key actions:
 | Action | Description |
 |---|---|
 | `sendMessage(content)` | Pushes user message, opens SSE stream, appends assistant chunks |
-| `loadHistory()` | Fetches all threads for the current user via `GET /api/history` |
-| `selectConversation(threadId)` | Switches to a thread and loads its messages |
-| `newConversation()` | Resets state to start a blank conversation |
+| `loadSessions()` | Fetches all threads for the current user via `GET /api/history` |
+| `selectSession(threadId)` | Switches to a thread and loads its messages |
+| `newSession()` | Resets state to start a blank session |
 
 `sendMessage` appends a placeholder assistant bubble (`loading: true`) immediately,
 then fills `content` incrementally as SSE `message_chunk` events arrive.
@@ -156,7 +156,7 @@ uses `fetch` + `ReadableStream` for full control). Callbacks:
 
 ```ts
 {
-  onConversation(threadId: string): void   // fires once, on first SSE event
+  onSession(threadId: string): void        // fires once, on first SSE event
   onChunk(chunk: string): void             // fires for each text fragment
   onDone(): void                           // stream finished cleanly
   onError(err: Error): void                // stream finished with error
@@ -167,7 +167,7 @@ uses `fetch` + `ReadableStream` for full control). Callbacks:
 
 | Event | Payload | Handled? |
 |---|---|---|
-| `conversation` | `{ thread_id }` | ✅ sets `currentThreadId` |
+| `session` | `{ thread_id }` | ✅ sets `currentThreadId` |
 | `message_chunk` | `{ content }` | ✅ appends text to assistant bubble |
 | `complete` | `{ thread_id }` | ✅ calls `onDone` |
 | `error` | `{ error }` | ✅ calls `onError` |
@@ -189,7 +189,7 @@ Both return empty arrays on any error (fail-safe, no throws).
 
 | Component | Role |
 |---|---|
-| `<Conversations>` | Left sidebar — conversation list with "New chat" button |
+| `<Conversations>` | Left sidebar component — session list with "New chat" button |
 | `<Bubble>` | Individual message bubble (user / assistant) |
 | `<Sender>` | Bottom input area with send button |
 
@@ -241,12 +241,12 @@ backend, or configure a reverse proxy so `/api` routes hit the backend.
 - **Error UX**: API errors display a raw "请求失败：…" string in the chat bubble.
   Consider a dedicated error state / toast notification.
 
-- **Conversation deletion**: `ChatView.vue` currently displays a "删除" menu
+- **Session deletion**: `ChatView.vue` currently displays a "删除" menu
   item, but it has no action and the backend has no delete endpoint. Do not
   describe deletion as supported until both sides are implemented.
 
 - **Message pagination**: `fetchThreadMessages` returns all messages for a thread.
-  For long conversations, add a `limit` / `cursor` parameter and lazy-load older
+  For long sessions, add a `limit` / `cursor` parameter and lazy-load older
   messages as the user scrolls up.
 
 - **`dist/` and `node_modules/`** are gitignored via `frontend/.gitignore`.

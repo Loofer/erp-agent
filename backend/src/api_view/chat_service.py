@@ -12,7 +12,7 @@ from langgraph.types import Command
 
 from agent.rag.hybrid_retriever import HybridRetriever, render_retrieval_context
 
-from .chat_persistence import ConversationRepository, ThreadInfo
+from .chat_persistence import SessionEvent, SessionInfo, SessionRepository
 
 setup_logging()
 _log = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ class ChatService:
     def __init__(
         self,
         graph: Any | None,
-        conversations: ConversationRepository,
+        sessions: SessionRepository | None,
         *,
         graph_factory: Callable[[], Any] | None = None,
         agent_id: str = "motorparts-agent",
@@ -44,7 +44,7 @@ class ChatService:
     ) -> None:
         self._graph = graph
         self._graph_factory = graph_factory
-        self._conversations = conversations
+        self._sessions = sessions
         self._agent_id = agent_id
         self._rag_retriever = rag_retriever
         self._debug = debug
@@ -62,7 +62,7 @@ class ChatService:
 
         # user_id / agent_id injected into every checkpoint via config["metadata"].
         # initial_prompt is stored on the first run only; resume passes None so
-        # later checkpoints omit it — MAX() in list_threads() recovers the value.
+        # later checkpoints omit it — MAX() in list_sessions() recovers the value.
         metadata: dict[str, object] = {
             "user_id": user_id,
             "agent_id": self._agent_id,
@@ -94,7 +94,16 @@ class ChatService:
             except Exception:  # noqa: BLE001
                 _log.exception("RAG retrieval failed for thread %s", thread_id)
 
-        yield self._event("conversation", thread_id, data={})
+        turn_events = _SessionEventBuffer(
+            thread_id=thread_id,
+            turn_id=uuid.uuid4().hex,
+            user_id=user_id,
+            agent_id=self._agent_id,
+        )
+        if message is not None:
+            turn_events.append_user_message(message)
+
+        yield self._event("session", thread_id, data={})
 
         graph_input: object = (
             Command(resume=resume_data)
@@ -137,12 +146,14 @@ class ChatService:
                                 continue
                             seen_interrupts.add(interrupt_id)
                         interrupted = True
-                        yield self._event(
+                        event = self._event(
                             "interrupt",
                             thread_id,
                             namespace=ns_list,
                             data=_interrupt_data(item, thread_id, ns_list),
                         )
+                        turn_events.append_sse_event(event)
+                        yield event
                     if interrupts:
                         # Keep draining: LangGraph must finish unwinding for the
                         # checkpoint to record the pending interrupt.  Breaking
@@ -154,7 +165,9 @@ class ChatService:
                         ns_list,
                         emitted_tool_calls,
                     ):
-                        yield self._event(**event)
+                        sse_event = self._event(**event)
+                        turn_events.append_sse_event(sse_event)
+                        yield sse_event
                 elif chunk_type == "messages":
                     # v2 "messages" payload is one (message_chunk, metadata)
                     # tuple — not a list of them.  Iterating it yields the
@@ -171,32 +184,51 @@ class ChatService:
                         ns_list,
                         meta,
                     ):
-                        yield self._event(**event)
+                        sse_event = self._event(**event)
+                        turn_events.append_sse_event(sse_event)
+                        yield sse_event
         except Exception:  # noqa: BLE001
             # 生产禁止直接repr(exc)对外暴露堆栈！
             _log.exception("Agent run failed for thread %s", thread_id)
-            yield self._event(
+            error_event = self._event(
                 "error", thread_id, data={"message": "Agent run exception, try again later"}
             )
+            turn_events.append_sse_event(error_event)
+            await self._persist_turn_events(turn_events)
+            yield error_event
             return
 
         if not interrupted:
-            yield self._event("complete", thread_id, data={})
+            complete_event = self._event("complete", thread_id, data={})
+            turn_events.append_sse_event(complete_event)
+            await self._persist_turn_events(turn_events)
+            yield complete_event
+            return
 
-    async def list_threads(self, user_id: str) -> list[ThreadInfo]:
-        """List the active agent's conversation threads for one user."""
-        return await self._conversations.list_threads(user_id, self._agent_id)
+        await self._persist_turn_events(turn_events)
 
-    async def get_thread_messages(
+    async def list_sessions(self, user_id: str) -> list[SessionInfo]:
+        """List the active agent's sessions for one user."""
+        if self._sessions is None:
+            return []
+        return await self._sessions.list_sessions(user_id, self._agent_id)
+
+    async def get_session_messages(
         self, thread_id: str, user_id: str
     ) -> dict[str, object]:
-        """Return a flat, user-visible timeline from the checkpoint state.
+        """Return the durable session timeline, with checkpoint fallback.
 
-        ``messages`` is the durable LangGraph state.  Keeping the projection
-        here means history uses the same checkpoint source as normal chat,
-        without a second event-log table.  Tool calls and ToolMessages are
-        retained as independent timeline items instead of being discarded.
+        The session event log includes child-graph text and tool activity that
+        DeepAgents deliberately omits from the parent checkpoint state.
         """
+        if self._sessions is not None:
+            events = await self._sessions.get_session_events(
+                thread_id, user_id, self._agent_id
+            )
+            if events:
+                return {"messages": _serialize_session_timeline(events)}
+            if not await self._sessions.owns_session(thread_id, user_id, self._agent_id):
+                return {"messages": []}
         config = {
             "configurable": {
                 "thread_id": thread_id,
@@ -210,6 +242,14 @@ class ChatService:
             return {"messages": []}
         raw_messages = state.values.get("messages", [])
         return {"messages": _serialize_timeline(raw_messages)}
+
+    async def _persist_turn_events(self, events: "_SessionEventBuffer") -> None:
+        if self._sessions is None:
+            return
+        try:
+            await self._sessions.append_events(events.events)
+        except Exception:  # noqa: BLE001
+            _log.exception("Session event persistence failed for thread %s", events.thread_id)
 
     def _get_graph(self) -> Any:
         if self._graph is None:
@@ -250,6 +290,115 @@ class ChatService:
                 "raw_message": _debug_value(raw_message),
             }
         return {key: value for key, value in payload.items() if value is not None}
+
+
+class _SessionEventBuffer:
+    """Build a compact, append-only session event batch for one graph run."""
+
+    def __init__(
+        self, *, thread_id: str, turn_id: str, user_id: str, agent_id: str
+    ) -> None:
+        self.thread_id = thread_id
+        self._turn_id = turn_id
+        self._user_id = user_id
+        self._agent_id = agent_id
+        self._sequence = 0
+        self.events: list[SessionEvent] = []
+        self._text_event: SessionEvent | None = None
+
+    def append_user_message(self, content: str) -> None:
+        self._append("user_message", source="user", payload={"content": content})
+
+    def append_sse_event(self, event: dict[str, object]) -> None:
+        event_type = _string(event.get("event"))
+        if event_type == "message_chunk":
+            self._append_text(event)
+            return
+        if event_type == "session":
+            return
+        self._text_event = None
+        data = event.get("data") if isinstance(event.get("data"), dict) else {}
+        if event_type == "agent_routing":
+            self._append("agent_routing", event=event, payload=data)
+        elif event_type == "tool_call_start":
+            self._append("tool_call_start", event=event, payload=data)
+        elif event_type == "tool_call_end":
+            self._append("tool_call_end", event=event, payload=data)
+        elif event_type == "interrupt":
+            self._append("interrupt", event=event, payload=data)
+        elif event_type == "complete":
+            self._append("turn_completed", event=event, payload=data)
+        elif event_type == "error":
+            self._append("turn_error", event=event, payload=data)
+
+    def _append_text(self, event: dict[str, object]) -> None:
+        data = event.get("data") if isinstance(event.get("data"), dict) else {}
+        content = _string(data.get("content"))
+        if not content:
+            return
+        source = _event_source(event)
+        agent_name = _string(event.get("agent_name"))
+        namespace = _event_namespace(event)
+        if (
+            self._text_event is not None
+            and self._text_event["source"] == source
+            and self._text_event["agent_name"] == agent_name
+            and self._text_event["namespace"] == namespace
+            and self._text_event["message_id"] == _string(event.get("message_id"))
+        ):
+            existing = self._text_event["payload"].get("content", "")
+            self._text_event["payload"]["content"] = f"{existing}{content}"
+            return
+        self._text_event = self._append(
+            "assistant_text",
+            event=event,
+            payload={"content": content},
+        )
+
+    def _append(
+        self,
+        event_type: str,
+        *,
+        source: str | None = None,
+        event: dict[str, object] | None = None,
+        payload: dict[str, object],
+    ) -> SessionEvent:
+        self._sequence += 1
+        stored: SessionEvent = {
+            "event_id": (_string(event.get("event_id")) if event else None)
+            or uuid.uuid4().hex,
+            "thread_id": self.thread_id,
+            "turn_id": self._turn_id,
+            "sequence": self._sequence,
+            "event_type": event_type,
+            "user_id": self._user_id,
+            "agent_id": self._agent_id,
+            "source": source or _event_source(event or {}),
+            "namespace": _event_namespace(event or {}),
+            "agent_name": _string((event or {}).get("agent_name")),
+            "message_id": _string((event or {}).get("message_id")),
+            "tool_call_id": _string(payload.get("tool_call_id")),
+            "tool_name": _string(payload.get("tool_name")),
+            "payload": dict(payload),
+            "created_at": datetime.now(UTC),
+        }
+        self.events.append(stored)
+        return stored
+
+
+def _event_namespace(event: dict[str, object]) -> list[str]:
+    namespace = event.get("namespace")
+    return [item for item in namespace if isinstance(item, str)] if isinstance(namespace, list) else []
+
+
+def _event_source(event: dict[str, object]) -> str:
+    agent_name = _string(event.get("agent_name"))
+    if agent_name:
+        return agent_name
+    for item in _event_namespace(event):
+        if item.startswith("tools:"):
+            return item.removeprefix("tools:")
+    return "main"
 
 
 def _message_data(message: object, thread_id: str) -> object:
@@ -295,6 +444,8 @@ def _semantic_message_events(
 
     if isinstance(message, ToolMessage) or _is_test_message(data, "tool"):
         tool_name = _string(data.get("name"))
+        # ToolMessage.name is the tool name, not the agent that invoked it.
+        agent_name = _string(meta.get("lc_agent_name"))
         # A task result is an internal summary passed back to the parent agent.
         if tool_name == "task":
             return []
@@ -510,7 +661,7 @@ def _serialize_timeline(messages: object) -> list[dict[str, object]]:
 
     System messages are agent configuration and remain private.  The public
     message state does not reliably retain every inner subgraph token after a
-    restart, but it does retain root conversation messages, tool calls, and
+    restart, but it does retain root session messages, tool calls, and
     tool results.  Live SSE continues to display subagent output as it arrives.
     """
     if not isinstance(messages, list):
@@ -609,6 +760,86 @@ def _serialize_timeline(messages: object) -> list[dict[str, object]]:
                 }
             )
 
+    return timeline
+
+
+def _serialize_session_timeline(events: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Project append-only session events into the existing frontend timeline."""
+    timeline: list[dict[str, object]] = []
+    tool_calls: dict[str, int] = {}
+    for event in events:
+        event_type = _string(event.get("event_type"))
+        event_id = _string(event.get("event_id")) or uuid.uuid4().hex
+        payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+        actor_name = _string(event.get("agent_name")) or _string(event.get("source"))
+        namespace = event.get("namespace") if isinstance(event.get("namespace"), list) else []
+        if event_type == "user_message":
+            timeline.append(
+                {
+                    "id": event_id,
+                    "kind": "user",
+                    "role": "user",
+                    "content": _content_text(payload.get("content", "")),
+                }
+            )
+        elif event_type == "assistant_text":
+            timeline.append(
+                {
+                    "id": event_id,
+                    "kind": "assistant",
+                    "role": "assistant",
+                    "content": _content_text(payload.get("content", "")),
+                    "actor_name": actor_name,
+                    "namespace": namespace,
+                }
+            )
+        elif event_type == "agent_routing":
+            timeline.append(
+                {
+                    "id": event_id,
+                    "kind": "agent_routing",
+                    "content": "",
+                    "actor_name": actor_name,
+                    "tool_call_id": _string(payload.get("tool_call_id")),
+                    "subagent_type": _string(payload.get("subagent_type")),
+                    "description": _string(payload.get("description")),
+                    "namespace": namespace,
+                }
+            )
+        elif event_type == "tool_call_start":
+            tool_call_id = _string(payload.get("tool_call_id"))
+            entry = {
+                "id": f"tool-call:{tool_call_id or event_id}",
+                "kind": "tool_call",
+                "content": "",
+                "actor_name": actor_name,
+                "tool_call_id": tool_call_id,
+                "tool_name": _string(payload.get("tool_name")) or "tool",
+                "tool_args": payload.get("args") if isinstance(payload.get("args"), dict) else {},
+                "status": "running",
+                "namespace": namespace,
+            }
+            if tool_call_id:
+                tool_calls[tool_call_id] = len(timeline)
+            timeline.append(entry)
+        elif event_type == "tool_call_end":
+            tool_call_id = _string(payload.get("tool_call_id"))
+            status = "error" if payload.get("tool_status") == "error" else "success"
+            call_index = tool_calls.get(tool_call_id or "")
+            if call_index is not None:
+                timeline[call_index]["status"] = status
+            timeline.append(
+                {
+                    "id": _string(event.get("message_id")) or f"tool-result:{tool_call_id or event_id}",
+                    "kind": "tool_result",
+                    "content": _content_text(payload.get("result", "")),
+                    "actor_name": actor_name,
+                    "tool_call_id": tool_call_id,
+                    "tool_name": _string(payload.get("tool_name")) or "tool",
+                    "status": status,
+                    "namespace": namespace,
+                }
+            )
     return timeline
 
 

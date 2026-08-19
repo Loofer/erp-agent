@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 from .auth import request_user
-from .chat_persistence import ThreadInfo
+from .chat_persistence import SessionInfo
 from .dependencies import ChatServiceDependency
 
 router = APIRouter()
@@ -111,19 +111,19 @@ async def chat_resume(
 async def list_history(
         request: Request,
         service: ChatServiceDependency,
-) -> dict[str, list[ThreadInfo]]:
-    """Return the user's conversation threads with full metadata."""
-    return {"threads": await service.list_threads(request_user(request).user_id)}
+) -> dict[str, list[SessionInfo]]:
+    """Return the user's sessions with full metadata."""
+    return {"sessions": await service.list_sessions(request_user(request).user_id)}
 
 
 @router.get("/api/chat/{thread_id}/messages", tags=["chat"])
-async def get_thread_messages(
+async def get_session_messages(
         thread_id: str,
         request: Request,
         service: ChatServiceDependency,
 ) -> dict[str, object]:
-    """Return the stored human/AI messages for an existing thread."""
-    return await service.get_thread_messages(thread_id, request_user(request).user_id)
+    """Return stored messages for an existing session thread."""
+    return await service.get_session_messages(thread_id, request_user(request).user_id)
 
 
 # ---------------------------------------------------------------------------

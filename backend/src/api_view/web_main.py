@@ -22,7 +22,7 @@ from agent.rag.runtime import build_hybrid_retriever
 
 from .auth import JwtIdentityMiddleware
 from .chat import router as chat_router
-from .chat_persistence import ConversationRepository
+from .chat_persistence import SessionRepository
 from .chat_service import ChatService
 
 setup_logging()
@@ -48,9 +48,9 @@ async def lifespan(app: FastAPI):
             async with await AsyncConnection.connect(
                 settings.database_url,
                 autocommit=True,
-            ) as conversation_connection:
-                conversations = ConversationRepository(conversation_connection)
-                await conversations.setup()
+            ) as session_connection:
+                sessions = SessionRepository(session_connection)
+                await sessions.setup()
 
                 rag_retriever = None
                 try:
@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
 
                 app.state.chat_service = ChatService(
                     graph,
-                    conversations,
+                    sessions,
                     agent_id=settings.motorparts_agent_id,
                     rag_retriever=rag_retriever,
                     debug=settings.debug,
